@@ -1,0 +1,47 @@
+from typing import List, Optional
+from pydantic import BaseModel
+from app.schemas.sistema import Sistema
+from app.schemas.setor import SetorOut
+from app.schemas.grupo_email import GrupoEmailOut
+from .grupo_pasta import GrupoPastaOut
+
+class FuncionarioBase(BaseModel):
+    nome: str
+    sobrenome: str
+    setores_ids: List[int] = []
+    sistemas_ids: List[int] = []
+    grupos_email_ids: List[int] = []
+    grupos_pasta_ids: List[int] = []
+    grupos_ids: List[int] = []  # IDs dos grupos para associação do usuário
+    celular: Optional[str] = None
+    cargo: Optional[str] = None
+    email: str
+    equipe: Optional[str] = None
+    data_rescisao: Optional[str] = None
+    data_inclusao: Optional[str] = None
+    data_inativado: Optional[str] = None
+    cpf: Optional[str] = None
+    data_afastamento: Optional[str] = None
+    tipo_contrato: Optional[str] = None
+    data_retorno: Optional[str] = None
+    data_admissao: Optional[str] = None
+
+class FuncionarioCreate(FuncionarioBase):
+    pass
+
+class Funcionario(FuncionarioBase):
+    id: int
+    setores: List[SetorOut] = []
+    sistemas: List[Sistema] = []
+    grupos_email: List[GrupoEmailOut] = []
+    grupos_pasta: List[GrupoPastaOut] = []
+    equipe: Optional[str] = None
+    data_rescisao: Optional[str] = None
+    data_inclusao: Optional[str] = None
+    data_inativado: Optional[str] = None
+    cpf: Optional[str] = None
+    data_afastamento: Optional[str] = None
+    tipo_contrato: Optional[str] = None
+    data_retorno: Optional[str] = None
+    class Config:
+        from_attributes = True

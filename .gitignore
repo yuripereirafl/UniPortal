@@ -1,0 +1,15 @@
+# Node.js
+frontend/node_modules/
+backend/node_modules/
+
+# Python
+*.pyc
+__pycache__/
+backend/database.db
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
