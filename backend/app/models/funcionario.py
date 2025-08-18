@@ -7,20 +7,23 @@ from app.models.grupo_email import GrupoEmail
 
 funcionario_setor = Table(
     'funcionario_setor', Base.metadata,
-    Column('funcionario_id', Integer, ForeignKey('funcionarios.id')),
-    Column('setor_id', Integer, ForeignKey('setores.id'))
+    Column('funcionario_id', Integer, ForeignKey('rh_homologacao.funcionarios.id')),
+    Column('setor_id', Integer, ForeignKey('rh_homologacao.setores.id')),
+    schema='rh_homologacao'
 )
 
 funcionario_sistema = Table(
     'funcionario_sistema', Base.metadata,
-    Column('funcionario_id', Integer, ForeignKey('funcionarios.id')),
-    Column('sistema_id', Integer, ForeignKey('sistemas.id'))
+    Column('funcionario_id', Integer, ForeignKey('rh_homologacao.funcionarios.id')),
+    Column('sistema_id', Integer, ForeignKey('rh_homologacao.sistemas.id')),
+    schema='rh_homologacao'
 )
 
 funcionario_grupo_email = Table(
     'funcionario_grupo_email', Base.metadata,
-    Column('funcionario_id', Integer, ForeignKey('funcionarios.id')),
-    Column('grupo_email_id', Integer, ForeignKey('grupos_email.id'))
+    Column('funcionario_id', Integer, ForeignKey('rh_homologacao.funcionarios.id')),
+    Column('grupo_email_id', Integer, ForeignKey('rh_homologacao.grupos_email.id')),
+    schema='rh_homologacao'
 )
 
 
@@ -28,6 +31,7 @@ from app.models.grupo_pasta import funcionario_grupo_pasta
 
 class Funcionario(Base):
     __tablename__ = 'funcionarios'
+    __table_args__ = {'schema': 'rh_homologacao'}
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, nullable=False)
     sobrenome = Column(String, nullable=False)

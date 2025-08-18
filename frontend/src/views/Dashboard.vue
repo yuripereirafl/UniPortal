@@ -23,7 +23,14 @@
       </div>
     </aside>
     <main class="main-content">
-      <component :is="panelComponent" />
+      <component :is="panelComponent" v-if="activePanel !== 'quadroColaboradores'" />
+      <QuadroColaboradores v-else :colaboradores="funcionarios.map(f => ({
+        id: f.id,
+        nome: f.nome,
+        sobrenome: f.sobrenome,
+        setores: f.setores,
+        cargo: f.cargo
+      }))" />
     </main>
   </div>
 </template>
@@ -45,6 +52,7 @@ export default {
   data() {
     return {
       activePanel: 'dashboard',
+      funcionarios: []
     }
   },
   computed: {

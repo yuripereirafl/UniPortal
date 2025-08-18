@@ -8,6 +8,7 @@ from app.schemas.cargo import CargoOut
 
 
 class FuncionarioBase(BaseModel):
+    cargo_id: Optional[int] = None
     nome: str
     sobrenome: str
     setores_ids: List[int] = []
@@ -15,9 +16,8 @@ class FuncionarioBase(BaseModel):
     grupos_email_ids: List[int] = []
     grupos_pasta_ids: List[int] = []
     celular: Optional[str] = None
-    cargo_id: Optional[int] = None
     email: str
-    data_inclusao: str = ''
+    data_admissao: str = ''
     data_inativado: str = ''
     cpf: Optional[str] = None
     data_afastamento: Optional[str] = None
@@ -34,7 +34,7 @@ class Funcionario(FuncionarioBase):
     grupos_email: List[GrupoEmailOut] = []
     grupos_pasta: List[GrupoPastaOut] = []
     cargo: Optional[str] = None
-    data_inclusao: str = ''
+    data_admissao: str = ''
     data_inativado: str = ''
     cpf: Optional[str] = None
     data_afastamento: Optional[str] = None

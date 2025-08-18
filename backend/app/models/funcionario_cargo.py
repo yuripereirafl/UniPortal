@@ -4,7 +4,8 @@ from app.models.base import Base
 
 class FuncionarioCargo(Base):
     __tablename__ = 'funcionario_cargo'
-    funcionario_id = Column(Integer, ForeignKey('funcionarios.id'), primary_key=True)
+    __table_args__ = {'schema': 'rh_homologacao'}
+    funcionario_id = Column(Integer, ForeignKey('rh_homologacao.funcionarios.id'), primary_key=True)
     cargo_id = Column(Integer, ForeignKey('rh_homologacao.cargo.id'), primary_key=True)
     dt_inicio = Column(Date, nullable=True)
     dt_fim = Column(Date, nullable=True)

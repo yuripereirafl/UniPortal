@@ -55,7 +55,7 @@
             {{ func.sobrenome }}
           </td>
           <td>
-            {{ func.data_inclusao ? func.data_inclusao.split('-').reverse().join('/') : '—' }}
+            {{ func.data_admissao ? func.data_admissao.split('-').reverse().join('/') : '—' }}
           </td>
           <td>
             {{ func.data_inativado ? func.data_inativado.split('-').reverse().join('/') : '—' }}
@@ -124,7 +124,7 @@
             </div>
             <div>
               <label>Data de Admissão</label>
-              <input type="date" v-model="form.data_inclusao" />
+              <input type="date" v-model="form.data_admissao" />
             </div>
             <div>
               <label>Tipo de Contrato</label>
@@ -231,6 +231,7 @@
                 <label>Cargo:</label>
                 <CargoMultiSelect
                   v-model="form.cargo_id"
+                  :multiple="false"
                 />
               </div>
             </div>
@@ -263,21 +264,20 @@ export default {
       form: {
         nome: '',
         sobrenome: '',
-        cargos_ids: [],
-        atendente_marcacao: false,
         celular: '',
         email: '',
-        cpf: '',                // Novo campo
-        tipo_contrato: '',      // Novo campo
-        data_afastamento: '',   // Novo campo
-        data_retorno: '',       // Novo campo
+        cpf: '',
+        tipo_contrato: '',
+        data_afastamento: '',
+        data_retorno: '',
         grupo_email: '',
         setores_ids: [],
         sistemas_ids: [],
         grupos_email_ids: [],
         grupos_pasta_ids: [],
-        data_inclusao: '',
-        data_inativado: ''
+        data_admissao: '',
+        data_inativado: '',
+        cargo_id: null
       },
       gruposEmail: [],
       gruposPasta: [],
@@ -462,22 +462,22 @@ export default {
       return grupo ? grupo.nome : 'Grupo não encontrado';
     },
     async cadastrarFuncionario() {
-      // Garante que data_inclusao seja string no formato 'YYYY-MM-DD' ou vazio
-      let dataInclusaoFormatada = '';
-      if (this.form.data_inclusao) {
-        if (typeof this.form.data_inclusao === 'string') {
-          dataInclusaoFormatada = this.form.data_inclusao;
-        } else if (this.form.data_inclusao instanceof Date) {
-          const year = this.form.data_inclusao.getFullYear();
-          const month = String(this.form.data_inclusao.getMonth() + 1).padStart(2, '0');
-          const day = String(this.form.data_inclusao.getDate()).padStart(2, '0');
-          dataInclusaoFormatada = `${year}-${month}-${day}`;
+      // Garante que data_admissao seja string no formato 'YYYY-MM-DD' ou vazio
+      let dataAdmissaoFormatada = '';
+      if (this.form.data_admissao) {
+        if (typeof this.form.data_admissao === 'string') {
+          dataAdmissaoFormatada = this.form.data_admissao;
+        } else if (this.form.data_admissao instanceof Date) {
+          const year = this.form.data_admissao.getFullYear();
+          const month = String(this.form.data_admissao.getMonth() + 1).padStart(2, '0');
+          const day = String(this.form.data_admissao.getDate()).padStart(2, '0');
+          dataAdmissaoFormatada = `${year}-${month}-${day}`;
         }
       }
       await axios.post(`${API_BASE_URL}/funcionarios/`, {
         nome: this.form.nome,
         sobrenome: this.form.sobrenome,
-        cargo: this.form.cargo,
+        cargo_id: this.form.cargo_id,
         celular: this.form.celular,
         email: this.form.email || '',
         cpf: this.form.cpf,
@@ -486,7 +486,7 @@ export default {
         setores_ids: [...this.form.setores_ids],
         sistemas_ids: [...this.form.sistemas_ids],
         grupos_pasta_ids: [...this.form.grupos_pasta_ids],
-        data_inclusao: dataInclusaoFormatada,
+        data_admissao: dataAdmissaoFormatada,
         data_inativado: ''
       });
       await this.carregarFuncionarios();
@@ -502,16 +502,16 @@ export default {
         cargo: '',
         celular: '',
         email: '',
-        cpf: '',                // Novo campo
-        tipo_contrato: '',      // Novo campo
-        data_afastamento: '',   // Novo campo
-        data_retorno: '',       // Novo campo
+        cpf: '',
+        tipo_contrato: '',
+        data_afastamento: '',
+        data_retorno: '',
         grupo_email: '',
         setores_ids: [],
         sistemas_ids: [],
         grupos_email_ids: [],
         grupos_pasta_ids: [],
-        data_inclusao: '',
+        data_admissao: '',
         data_inativado: ''
       };
       this.novoGrupoId = '';
@@ -546,7 +546,7 @@ export default {
       this.form = {
         nome: func.nome,
         sobrenome: func.sobrenome,
-        cargo_id: func.cargo_id || '',
+        cargo_id: func.cargo_id || null,
         celular: func.celular,
         email: func.email,
         grupo_email: (func.grupo_email || ''),
@@ -554,7 +554,7 @@ export default {
         sistemas_ids: func.sistemas ? func.sistemas.map(s => s.id) : [],
         grupos_email_ids: func.grupos_email ? func.grupos_email.map(g => g.id) : [],
         grupos_pasta_ids: func.grupos_pasta ? func.grupos_pasta.map(g => g.id) : [],
-        data_inclusao: func.data_inclusao || '',
+        data_admissao: func.data_admissao || '',
         data_inativado: dataInativado || '',
         cpf: func.cpf || '',
         tipo_contrato: func.tipo_contrato || '',
@@ -569,17 +569,36 @@ export default {
       });
     },
     async salvarEdicaoFuncionario() {
-      // Garante que data_inativado seja string no formato 'YYYY-MM-DD' ou vazio
+      // Garante tipos corretos antes do envio
       let dataInativadoFormatada = '';
       if (this.form.data_inativado) {
         if (typeof this.form.data_inativado === 'string') {
           dataInativadoFormatada = this.form.data_inativado;
         } else if (this.form.data_inativado instanceof Date) {
-          // Formata para YYYY-MM-DD
           const year = this.form.data_inativado.getFullYear();
           const month = String(this.form.data_inativado.getMonth() + 1).padStart(2, '0');
           const day = String(this.form.data_inativado.getDate()).padStart(2, '0');
           dataInativadoFormatada = `${year}-${month}-${day}`;
+        }
+      }
+      // Arrays nunca undefined ou string
+      const grupos_email_ids = Array.isArray(this.form.grupos_email_ids) ? this.form.grupos_email_ids : [];
+      const setores_ids = Array.isArray(this.form.setores_ids) ? this.form.setores_ids : [];
+      const sistemas_ids = Array.isArray(this.form.sistemas_ids) ? this.form.sistemas_ids : [];
+      const grupos_pasta_ids = Array.isArray(this.form.grupos_pasta_ids) ? this.form.grupos_pasta_ids : [];
+      // cargo_id nunca string vazia
+      let cargo_id = this.form.cargo_id;
+      if (cargo_id === '' || cargo_id === undefined) cargo_id = null;
+      // Garante formato correto para data_admissao
+      let dataAdmissaoFormatada = '';
+      if (this.form.data_admissao) {
+        if (typeof this.form.data_admissao === 'string') {
+          dataAdmissaoFormatada = this.form.data_admissao;
+        } else if (this.form.data_admissao instanceof Date) {
+          const year = this.form.data_admissao.getFullYear();
+          const month = String(this.form.data_admissao.getMonth() + 1).padStart(2, '0');
+          const day = String(this.form.data_admissao.getDate()).padStart(2, '0');
+          dataAdmissaoFormatada = `${year}-${month}-${day}`;
         }
       }
       await axios.put(`${API_BASE_URL}/funcionarios/${this.funcionarioEditId}`, {
@@ -592,11 +611,11 @@ export default {
         tipo_contrato: this.form.tipo_contrato,
         data_afastamento: this.form.data_afastamento,
         data_retorno: this.form.data_retorno,
-        grupos_email_ids: [...this.form.grupos_email_ids],
-        setores_ids: [...this.form.setores_ids],
-        sistemas_ids: [...this.form.sistemas_ids],
-        grupos_pasta_ids: [...this.form.grupos_pasta_ids],
-        data_inclusao: this.form.data_inclusao || '',
+        grupos_email_ids,
+        setores_ids,
+        sistemas_ids,
+        grupos_pasta_ids,
+        data_admissao: dataAdmissaoFormatada,
         data_inativado: dataInativadoFormatada
       });
       await this.carregarFuncionarios();

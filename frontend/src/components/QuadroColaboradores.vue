@@ -5,10 +5,13 @@
       <thead>
         <tr>
           <th>Nome</th>
+          <th>Sobrenome</th>
+          <th>Setor</th>
           <th>Cargo</th>
-          <th>Status</th>
           <th>Função</th>
           <th>Equipe</th>
+          <th>Nível</th>
+          <th>Status</th>
           <th>Valor da meta</th>
           <th>Tipo Pgto</th>
         </tr>
@@ -16,12 +19,20 @@
       <tbody>
         <tr v-for="colab in colaboradores" :key="colab.id">
           <td>{{ colab.nome }}</td>
-          <td>{{ colab.cargo }}</td>
-          <td>{{ colab.status }}</td>
-          <td>{{ colab.funcao }}</td>
-          <td>{{ colab.equipe }}</td>
-          <td>{{ colab.valor_meta }}</td>
-          <td>{{ colab.tipo_pgto }}</td>
+          <td>{{ colab.sobrenome || '-' }}</td>
+          <td>
+            <span v-if="colab.setores && colab.setores.length">
+              {{ colab.setores.join(', ') }}
+            </span>
+            <span v-else>—</span>
+          </td>
+          <td>{{ colab.cargo && colab.cargo.nome ? colab.cargo.nome : '-' }}</td>
+          <td>{{ colab.cargo && colab.cargo.funcao ? colab.cargo.funcao : '-' }}</td>
+          <td>{{ colab.cargo && colab.cargo.equipe ? colab.cargo.equipe : '-' }}</td>
+          <td>{{ colab.cargo && colab.cargo.nivel ? colab.cargo.nivel : '-' }}</td>
+          <td>{{ colab.filial && colab.filial.nome ? colab.filial.nome : '-' }}</td>
+          <td>{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</td>
+          <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
         </tr>
       </tbody>
     </table>
@@ -31,10 +42,28 @@
 <script>
 export default {
   name: 'QuadroColaboradores',
-  props: {
-    colaboradores: {
-      type: Array,
-      required: true
+  data() {
+    return {
+      colaboradores: [],
+      carregando: false,
+      erro: null
+    }
+  },
+  mounted() {
+    this.carregarColaboradores();
+  },
+  methods: {
+    async carregarColaboradores() {
+      this.carregando = true;
+      this.erro = null;
+      try {
+        const response = await fetch('http://localhost:8000/quadro_colaboradores/');
+        this.colaboradores = await response.json();
+      } catch (e) {
+        this.erro = 'Erro ao carregar colaboradores.';
+        this.colaboradores = [];
+      }
+      this.carregando = false;
     }
   }
 }
