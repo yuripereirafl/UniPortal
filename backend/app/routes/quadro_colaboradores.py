@@ -21,7 +21,7 @@ def quadro_colaboradores():
     ).all()
     resultado = []
     for funcionario in funcionarios:
-        setores = [s.nome for s in funcionario.setores]
+        setores = [{'id': s.id, 'nome': s.nome} for s in funcionario.setores]
         # Cargo atual
         cargo_vinculo = db.query(FuncionarioCargo).filter_by(funcionario_id=funcionario.id, dt_fim=None).order_by(FuncionarioCargo.dt_inicio.desc()).first()
         cargo = None

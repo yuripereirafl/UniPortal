@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel
 from app.schemas.sistema import Sistema
 from app.schemas.setor import SetorOut
@@ -23,7 +23,7 @@ class FuncionarioBase(BaseModel):
     data_afastamento: Optional[str] = None
     tipo_contrato: Optional[str] = None
     data_retorno: Optional[str] = None
-    meta: Optional[str] = None
+    meta: Optional[Union[float, str]] = None  # Aceita tanto float quanto string
     tipo_pgto: Optional[str] = None
 
 class FuncionarioCreate(FuncionarioBase):

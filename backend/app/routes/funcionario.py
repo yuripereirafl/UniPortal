@@ -129,12 +129,26 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioCreate):
         cargo_obj = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
         if cargo_obj:
             dt_inicio = datetime.now().date()
-            vinculo_existente = db.query(FuncionarioCargo).filter_by(
+            
+            # Verifica se já existe um vínculo ativo com o mesmo cargo na mesma data
+            vinculo_ativo_existente = db.query(FuncionarioCargo).filter_by(
                 funcionario_id=db_funcionario.id,
                 cargo_id=cargo_obj.id,
-                dt_inicio=dt_inicio
+                dt_inicio=dt_inicio,
+                dt_fim=None
             ).first()
-            if not vinculo_existente:
+            
+            if not vinculo_ativo_existente:
+                # Fecha outros vínculos ativos (com cargos diferentes)
+                vinculos_ativos = db.query(FuncionarioCargo).filter_by(
+                    funcionario_id=db_funcionario.id,
+                    dt_fim=None
+                ).all()
+                
+                for vinculo in vinculos_ativos:
+                    vinculo.dt_fim = dt_inicio
+                
+                # Cria novo vínculo apenas se não existir um igual
                 novo_vinculo = FuncionarioCargo(
                     funcionario_id=db_funcionario.id,
                     cargo_id=cargo_obj.id,
@@ -201,23 +215,55 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioCreate):
         db_funcionario.sistemas = []
     # Atualiza meta e tipo_pgto
     if hasattr(funcionario, 'meta') and funcionario.meta is not None and hasattr(funcionario, 'tipo_pgto') and funcionario.tipo_pgto is not None:
-        # Busca meta existente ou cria nova
-        meta_obj = db.query(Meta).filter_by(calc_meta=funcionario.meta, tipo_pgto=funcionario.tipo_pgto).first()
-        if not meta_obj:
-            meta_obj = Meta(calc_meta=funcionario.meta, tipo_pgto=funcionario.tipo_pgto)
-            db.add(meta_obj)
-            db.commit()
-            db.refresh(meta_obj)
-        # Atualiza vínculo na funcionario_meta
-        from datetime import date
-        dt_inicio = date.today()
-        vinculo_existente = db.query(FuncionarioMeta).filter_by(funcionario_id=db_funcionario.id, dt_fim=None).first()
-        if vinculo_existente:
-            vinculo_existente.dt_fim = dt_inicio
-            db.commit()
-        novo_vinculo = FuncionarioMeta(funcionario_id=db_funcionario.id, meta_id=meta_obj.id, dt_inicio=dt_inicio)
-        db.add(novo_vinculo)
-        db.commit()
+        try:
+            # Converte meta para float se for string
+            meta_valor = float(funcionario.meta) if isinstance(funcionario.meta, str) else funcionario.meta
+            
+            # Busca meta existente ou cria nova
+            meta_obj = db.query(Meta).filter_by(calc_meta=meta_valor, tipo_pgto=funcionario.tipo_pgto).first()
+            if not meta_obj:
+                meta_obj = Meta(calc_meta=meta_valor, tipo_pgto=funcionario.tipo_pgto)
+                db.add(meta_obj)
+                db.commit()
+                db.refresh(meta_obj)
+            
+            # Verifica se já existe um vínculo ativo com a mesma meta
+            from datetime import date
+            dt_inicio = date.today()
+            vinculo_ativo_existente = db.query(FuncionarioMeta).filter_by(
+                funcionario_id=db_funcionario.id, 
+                meta_id=meta_obj.id,
+                dt_inicio=dt_inicio,
+                dt_fim=None
+            ).first()
+            
+            if not vinculo_ativo_existente:
+                # Fecha outros vínculos ativos (com metas diferentes)
+                vinculos_ativos = db.query(FuncionarioMeta).filter_by(
+                    funcionario_id=db_funcionario.id, 
+                    dt_fim=None
+                ).all()
+                
+                for vinculo in vinculos_ativos:
+                    vinculo.dt_fim = dt_inicio
+                
+                db.commit()
+                
+                # Cria novo vínculo apenas se não existir um igual
+                novo_vinculo = FuncionarioMeta(
+                    funcionario_id=db_funcionario.id, 
+                    meta_id=meta_obj.id, 
+                    dt_inicio=dt_inicio
+                )
+                db.add(novo_vinculo)
+                db.commit()
+        except (ValueError, TypeError) as e:
+            db.close()
+            raise HTTPException(status_code=422, detail=f"Valor de meta inválido: {funcionario.meta}. Deve ser um número (0, 0.5 ou 1).")
+        except Exception as e:
+            db.rollback()
+            db.close()
+            raise HTTPException(status_code=500, detail=f"Erro ao processar meta: {str(e)}")
     db.commit()
     db.refresh(db_funcionario)
     cargo_nome = None

@@ -63,9 +63,9 @@
               <div class="tag-container">
                 <span v-if="colab.setores && colab.setores.length" 
                       v-for="setor in colab.setores.slice(0, 2)" 
-                      :key="setor" 
+                      :key="setor.id" 
                       class="tag tag-setor">
-                  {{ setor }}
+                  {{ setor.nome }}
                 </span>
                 <span v-if="colab.setores && colab.setores.length > 2" class="tag tag-more">
                   +{{ colab.setores.length - 2 }}
@@ -218,10 +218,10 @@ export default {
         'Pelo que realizou'
       ],
       opcoesValoresRealizados: [
-        '0', '0.5', '1'
+        0, 0.5, 1
       ],
       opcoesValoresUnidade: [
-        '0', '0.5', '1'
+        0, 0.5, 1
       ]
     }
   },
@@ -270,31 +270,26 @@ export default {
       this.carregando = false;
     },
     editarColaborador(colaborador) {
-  console.log('Editando colaborador:', colaborador);
-  console.log('Setores disponíveis:', this.setores);
-      // Preencher todos os campos esperados pelo backend
+      console.log('Editando colaborador:', colaborador);
+      console.log('Setores disponíveis:', this.setores);
       console.log('Setores do colaborador:', colaborador.setores);
+      
+      // Preenche setor_id - agora os setores vêm como objetos {id, nome}
       let setorId = '';
       if (colaborador.setores && colaborador.setores.length > 0) {
-        if (typeof colaborador.setores[0] === 'object' && colaborador.setores[0].setor_id) {
-          setorId = colaborador.setores[0].setor_id;
-        } else if (typeof colaborador.setores[0] === 'string') {
-          // Busca o id pelo nome no array de setores disponíveis, normalizando
-          const setorNomeColab = colaborador.setores[0].toLowerCase().trim();
-          const setorObj = this.setores.find(s => s.nome.toLowerCase().trim() === setorNomeColab);
-          setorId = setorObj ? setorObj.setor_id : '';
-        }
+        // Agora os setores vêm como objetos com id e nome
+        setorId = colaborador.setores[0].id;
       }
-      console.log('Setor selecionado para o modal:', setorId);
+      
+      console.log('Setor ID selecionado para o modal:', setorId);
+      
       this.colaboradorEditando = {
-        // ...existing code...
-        setor_id: setorId,
         id: colaborador.id,
         nome: colaborador.nome || '',
         sobrenome: colaborador.sobrenome || '',
         cargo_id: colaborador.cargo?.id || null,
-  // Preenche setor_id como id do setor, para select único
-  setor_id: colaborador.setores && colaborador.setores.length > 0 ? colaborador.setores[0].id : '',
+        // Preenche setor_id como id do setor, para select único
+        setor_id: setorId,
         sistemas_ids: colaborador.sistemas?.map(s => s.id) || [],
         grupos_email_ids: colaborador.grupos_email?.map(g => g.id) || [],
         grupos_pasta_ids: colaborador.grupos_pasta?.map(g => g.id) || [],
@@ -327,17 +322,41 @@ export default {
     async salvarEdicao() {
       this.salvando = true;
       try {
-        // Fazer PUT para atualizar o funcionário
-        if (!this.colaboradorEditando.email || this.colaboradorEditando.email.trim() === '') {
-          alert('O campo email é obrigatório!');
+        // Validações básicas
+        if (!this.colaboradorEditando.nome || this.colaboradorEditando.nome.trim() === '') {
+          alert('O campo nome é obrigatório!');
           this.salvando = false;
           return;
         }
+        if (!this.colaboradorEditando.sobrenome || this.colaboradorEditando.sobrenome.trim() === '') {
+          alert('O campo sobrenome é obrigatório!');
+          this.salvando = false;
+          return;
+        }
+
+        // Validação da meta se fornecida
+        if (this.colaboradorEditando.meta !== null && this.colaboradorEditando.meta !== '' && this.colaboradorEditando.meta !== undefined) {
+          const metaValor = parseFloat(this.colaboradorEditando.meta);
+          if (isNaN(metaValor) || ![0, 0.5, 1].includes(metaValor)) {
+            alert('Meta deve ser um dos valores: 0, 0.5 ou 1');
+            this.salvando = false;
+            return;
+          }
+        }
+
+        // Validação do tipo de pagamento se meta for fornecida
+        if (this.colaboradorEditando.meta && !this.colaboradorEditando.tipo_pgto) {
+          alert('Tipo de pagamento é obrigatório quando uma meta é definida!');
+          this.salvando = false;
+          return;
+        }
+
         const payload = {
-          nome: this.colaboradorEditando.nome || '',
-          sobrenome: this.colaboradorEditando.sobrenome || '',
+          nome: this.colaboradorEditando.nome.trim(),
+          sobrenome: this.colaboradorEditando.sobrenome.trim(),
           cargo_id: this.colaboradorEditando.cargo_id || null,
-          setor_id: this.colaboradorEditando.setor_id || null,
+          // Backend espera setores_ids como array
+          setores_ids: this.colaboradorEditando.setor_id ? [parseInt(this.colaboradorEditando.setor_id)] : [],
           sistemas_ids: this.colaboradorEditando.sistemas_ids || [],
           grupos_email_ids: this.colaboradorEditando.grupos_email_ids || [],
           grupos_pasta_ids: this.colaboradorEditando.grupos_pasta_ids || [],
@@ -349,10 +368,17 @@ export default {
           data_afastamento: this.colaboradorEditando.data_afastamento || '',
           tipo_contrato: this.colaboradorEditando.tipo_contrato || '',
           data_retorno: this.colaboradorEditando.data_retorno || '',
-          meta: this.colaboradorEditando.meta,
-          tipo_pgto: this.colaboradorEditando.tipo_pgto
+          // Garantir que meta seja enviada como número (float) e tipo_pgto como string
+          meta: this.colaboradorEditando.meta ? parseFloat(this.colaboradorEditando.meta) : null,
+          tipo_pgto: this.colaboradorEditando.tipo_pgto || null
         };
-        console.log('Payload enviado no PUT:', payload);
+        console.log('=== PAYLOAD DEBUG ===');
+        console.log('Payload completo enviado no PUT:', JSON.stringify(payload, null, 2));
+        console.log('Tipo da meta:', typeof payload.meta, 'Valor:', payload.meta);
+        console.log('Tipo do tipo_pgto:', typeof payload.tipo_pgto, 'Valor:', payload.tipo_pgto);
+        console.log('setores_ids:', payload.setores_ids);
+        console.log('=====================');
+        
         const response = await fetch(`/funcionarios/${this.colaboradorEditando.id}`, {
           method: 'PUT',
           headers: {
@@ -362,7 +388,15 @@ export default {
         });
         
         if (!response.ok) {
-          throw new Error(`Erro ao salvar: ${response.status}`);
+          // Tenta ler detalhes do erro do backend (FastAPI retorna JSON com detalhes)
+          let errorDetails = '';
+          try {
+            const errorData = await response.json();
+            errorDetails = JSON.stringify(errorData, null, 2);
+          } catch (e) {
+            errorDetails = await response.text();
+          }
+          throw new Error(`Erro ${response.status}: ${errorDetails}`);
         }
         
         // Recarregar a tabela
