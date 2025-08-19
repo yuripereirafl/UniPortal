@@ -16,13 +16,15 @@ class FuncionarioBase(BaseModel):
     grupos_email_ids: List[int] = []
     grupos_pasta_ids: List[int] = []
     celular: Optional[str] = None
-    email: str
+    email: Optional[str] = None
     data_admissao: str = ''
     data_inativado: str = ''
     cpf: Optional[str] = None
     data_afastamento: Optional[str] = None
     tipo_contrato: Optional[str] = None
     data_retorno: Optional[str] = None
+    meta: Optional[str] = None
+    tipo_pgto: Optional[str] = None
 
 class FuncionarioCreate(FuncionarioBase):
     pass

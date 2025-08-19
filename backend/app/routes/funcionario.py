@@ -14,6 +14,8 @@ from ..schemas.setor import SetorOut
 from ..schemas.grupo_email import GrupoEmailOut
 from ..schemas.grupo_pasta import GrupoPastaOut
 from ..database import engine
+from app.models.meta import Meta
+from app.models.funcionario_meta import FuncionarioMeta
 
 router = APIRouter()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -197,6 +199,25 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioCreate):
         db_funcionario.sistemas = sistemas
     else:
         db_funcionario.sistemas = []
+    # Atualiza meta e tipo_pgto
+    if hasattr(funcionario, 'meta') and funcionario.meta is not None and hasattr(funcionario, 'tipo_pgto') and funcionario.tipo_pgto is not None:
+        # Busca meta existente ou cria nova
+        meta_obj = db.query(Meta).filter_by(calc_meta=funcionario.meta, tipo_pgto=funcionario.tipo_pgto).first()
+        if not meta_obj:
+            meta_obj = Meta(calc_meta=funcionario.meta, tipo_pgto=funcionario.tipo_pgto)
+            db.add(meta_obj)
+            db.commit()
+            db.refresh(meta_obj)
+        # Atualiza vínculo na funcionario_meta
+        from datetime import date
+        dt_inicio = date.today()
+        vinculo_existente = db.query(FuncionarioMeta).filter_by(funcionario_id=db_funcionario.id, dt_fim=None).first()
+        if vinculo_existente:
+            vinculo_existente.dt_fim = dt_inicio
+            db.commit()
+        novo_vinculo = FuncionarioMeta(funcionario_id=db_funcionario.id, meta_id=meta_obj.id, dt_inicio=dt_inicio)
+        db.add(novo_vinculo)
+        db.commit()
     db.commit()
     db.refresh(db_funcionario)
     cargo_nome = None

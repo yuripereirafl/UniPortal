@@ -41,6 +41,8 @@ def quadro_colaboradores():
             'id': funcionario.id,
             'nome': funcionario.nome,
             'sobrenome': funcionario.sobrenome,
+            'email': funcionario.email,
+            'cpf': funcionario.cpf,
             'setores': setores,
             'cargo': {
                 'id': cargo.id if cargo else None,
