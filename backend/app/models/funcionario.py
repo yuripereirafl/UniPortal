@@ -1,5 +1,5 @@
 from app.models.cargo import Cargo
-from sqlalchemy import Column, Integer, String, Table, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Table, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from app.models.grupo_email import GrupoEmail
@@ -40,8 +40,9 @@ class Funcionario(Base):
     equipe = Column(String, nullable=True)
     data_admissao = Column(String, nullable=True)
     data_rescisao = Column(String, nullable=True)
-    data_afastamento = Column(String, nullable=True)
-    data_retorno = Column(String, nullable=True)
+    data_afastamento = Column(Date, nullable=True)
+    data_retorno = Column(Date, nullable=True)
+    motivo_afastamento = Column(String, nullable=True)
     cpf = Column(String, unique=True)
     data_inativado = Column(String, nullable=True)
     tipo_contrato = Column(String, nullable=True)

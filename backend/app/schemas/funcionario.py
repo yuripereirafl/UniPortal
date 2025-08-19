@@ -23,6 +23,7 @@ class FuncionarioBase(BaseModel):
     data_afastamento: Optional[str] = None
     tipo_contrato: Optional[str] = None
     data_retorno: Optional[str] = None
+    motivo_afastamento: Optional[str] = None
     meta: Optional[Union[float, str]] = None  # Aceita tanto float quanto string
     tipo_pgto: Optional[str] = None
 
@@ -51,6 +52,7 @@ class FuncionarioUpdate(BaseModel):
     data_afastamento: Optional[str] = None
     tipo_contrato: Optional[str] = None
     data_retorno: Optional[str] = None
+    motivo_afastamento: Optional[str] = None
     meta: Optional[Union[float, str]] = None
     tipo_pgto: Optional[str] = None
 
@@ -67,5 +69,6 @@ class Funcionario(FuncionarioBase):
     data_afastamento: Optional[str] = None
     tipo_contrato: Optional[str] = None
     data_retorno: Optional[str] = None
+    motivo_afastamento: Optional[str] = None
 class Config:
         from_attributes = True

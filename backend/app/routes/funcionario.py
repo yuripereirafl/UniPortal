@@ -17,6 +17,18 @@ from ..database import engine
 from app.models.meta import Meta
 from app.models.funcionario_meta import FuncionarioMeta
 
+def converter_string_para_date(data_str):
+    """Converte string de data para objeto date"""
+    if not data_str or data_str.strip() == '':
+        return None
+    try:
+        return datetime.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        try:
+            return datetime.strptime(data_str, '%d/%m/%Y').date()
+        except ValueError:
+            return None
+
 router = APIRouter()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -29,9 +41,9 @@ def adicionar_funcionario(funcionario: FuncionarioCreate):
         celular=funcionario.celular,
         email=funcionario.email,
         cpf=funcionario.cpf,
-        data_afastamento=funcionario.data_afastamento if funcionario.data_afastamento not in ('', None) else None,
+        data_afastamento=converter_string_para_date(funcionario.data_afastamento),
         tipo_contrato=funcionario.tipo_contrato,
-        data_retorno=funcionario.data_retorno if funcionario.data_retorno not in ('', None) else None,
+        data_retorno=converter_string_para_date(funcionario.data_retorno),
         data_inativado=funcionario.data_inativado if funcionario.data_inativado not in ('', None) else None
     )
     db.add(novo_funcionario)
@@ -171,22 +183,15 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
     if cargo_obj:
         dt_inicio = date.today()
         
-        # Verifica se já existe um vínculo ativo com o mesmo cargo na mesma data
+        # Verifica se já existe um vínculo ativo com o mesmo cargo
         vinculo_ativo_existente = db.query(FuncionarioCargo).filter_by(
             funcionario_id=db_funcionario.id,
             cargo_id=cargo_obj.id,
-            dt_inicio=dt_inicio,
             dt_fim=None
         ).first()
         
         if not vinculo_ativo_existente:
-            # Fecha outros vínculos ativos (com cargos diferentes) usando update direto
-            db.query(FuncionarioCargo).filter_by(
-                funcionario_id=db_funcionario.id,
-                dt_fim=None
-            ).update({FuncionarioCargo.dt_fim: dt_inicio})
-            
-            # Cria novo vínculo apenas se não existir um igual
+            # SIMPLIFICADO: apenas insere - o trigger do banco cuida do fechamento
             novo_vinculo = FuncionarioCargo(
                 funcionario_id=db_funcionario.id,
                 cargo_id=cargo_obj.id,
@@ -197,17 +202,20 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
                 cargo_equipe=getattr(cargo_obj, 'equipe', None)
             )
             db.add(novo_vinculo)
-            db.flush()  # Usa flush ao invés de commit aqui
+            db.flush()
     
     # Só atualiza datas se foram fornecidas e não estão vazias
     if hasattr(funcionario, 'data_admissao') and funcionario.data_admissao not in ('', None):
         db_funcionario.data_admissao = str(funcionario.data_admissao)
     
     if hasattr(funcionario, 'data_afastamento') and funcionario.data_afastamento not in ('', None):
-        db_funcionario.data_afastamento = funcionario.data_afastamento
+        db_funcionario.data_afastamento = converter_string_para_date(funcionario.data_afastamento)
     
     if hasattr(funcionario, 'data_retorno') and funcionario.data_retorno not in ('', None):
-        db_funcionario.data_retorno = funcionario.data_retorno
+        db_funcionario.data_retorno = converter_string_para_date(funcionario.data_retorno)
+    
+    if hasattr(funcionario, 'motivo_afastamento') and funcionario.motivo_afastamento not in ('', None):
+        db_funcionario.motivo_afastamento = funcionario.motivo_afastamento
     
     if hasattr(funcionario, 'data_inativado') and funcionario.data_inativado not in ('', None):
         db_funcionario.data_inativado = str(funcionario.data_inativado)
@@ -255,36 +263,25 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
                 db.flush()  # Usa flush ao invés de commit
                 db.refresh(meta_obj)
             
-            # Lógica mais simples e robusta: remove todos os vínculos de hoje e cria novo
+            # Verifica se já existe vínculo ativo com a mesma meta
             dt_inicio = date.today()
             
-            # Remove TODOS os vínculos ativos de hoje para este funcionário (se existirem)
-            db.query(FuncionarioMeta).filter_by(
+            # Busca vínculo ativo existente com a mesma meta
+            vinculo_meta_existente = db.query(FuncionarioMeta).filter_by(
                 funcionario_id=db_funcionario.id,
-                dt_inicio=dt_inicio
-            ).delete()
-            
-            # Fecha vínculos anteriores (com data anterior a hoje)
-            from datetime import timedelta
-            data_fechamento = dt_inicio - timedelta(days=1)
-            db.query(FuncionarioMeta).filter_by(
-                funcionario_id=db_funcionario.id,
+                meta_id=meta_obj.id,
                 dt_fim=None
-            ).filter(FuncionarioMeta.dt_inicio < dt_inicio).update({
-                FuncionarioMeta.dt_fim: data_fechamento
-            })
+            ).first()
             
-            # Força flush das operações anteriores
-            db.flush()
-            
-            # Agora cria o novo vínculo (garantido sem duplicação)
-            novo_vinculo = FuncionarioMeta(
-                funcionario_id=db_funcionario.id, 
-                meta_id=meta_obj.id, 
-                dt_inicio=dt_inicio
-            )
-            db.add(novo_vinculo)
-            db.flush()
+            if not vinculo_meta_existente:
+                # SIMPLIFICADO: apenas insere - o trigger do banco cuida do fechamento
+                novo_vinculo = FuncionarioMeta(
+                    funcionario_id=db_funcionario.id, 
+                    meta_id=meta_obj.id, 
+                    dt_inicio=dt_inicio
+                )
+                db.add(novo_vinculo)
+                db.flush()
         except (ValueError, TypeError) as e:
             db.close()
             raise HTTPException(status_code=422, detail=f"Valor de meta inválido: {funcionario.meta}. Deve ser um número (0, 0.5 ou 1).")
@@ -354,9 +351,10 @@ def list_funcionarios():
             'data_admissao': str(funcionario.data_admissao) if funcionario.data_admissao not in (None, '') else '',
             'data_inativado': str(funcionario.data_inativado) if funcionario.data_inativado is not None else '',
             'cpf': funcionario.cpf,
-            'data_afastamento': str(funcionario.data_afastamento) if funcionario.data_afastamento else None,
+            'data_afastamento': funcionario.data_afastamento.strftime('%Y-%m-%d') if funcionario.data_afastamento else None,
             'tipo_contrato': funcionario.tipo_contrato,
-            'data_retorno': str(funcionario.data_retorno) if funcionario.data_retorno else None
+            'data_retorno': funcionario.data_retorno.strftime('%Y-%m-%d') if funcionario.data_retorno else None,
+            'motivo_afastamento': funcionario.motivo_afastamento
         })
         resultado.append(funcionario_schema)
     db.close()

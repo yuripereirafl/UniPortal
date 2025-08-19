@@ -86,7 +86,9 @@
               </span>
             </td>
             <td>
-              <span class="status-indicator status-active">{{ colab.filial && colab.filial.nome ? colab.filial.nome : '-' }}</span>
+              <span :class="['status-indicator', colab.status === 'Ativo' ? 'status-active' : 'status-afastado']">
+                {{ colab.status || 'Ativo' }}
+              </span>
             </td>
             <td>
               <span class="meta-value">{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</span>
@@ -208,6 +210,38 @@
                 </select>
               </div>
             </div>
+            <!-- Seção de Afastamento -->
+            <div class="form-group">
+              <label><i class="fas fa-calendar-times"></i> Data de Afastamento</label>
+              <input v-model="colaboradorEditando.data_afastamento" type="date" placeholder="Data do afastamento" />
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-calendar-check"></i> Data de Retorno</label>
+              <input v-model="colaboradorEditando.data_retorno" type="date" placeholder="Data de retorno" />
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-clipboard-list"></i> Motivo do Afastamento</label>
+              <select v-model="colaboradorEditando.motivo_afastamento">
+                <option value="">Selecione o motivo</option>
+                <option value="Férias">Férias</option>
+                <option value="Licença Médica">Licença Médica</option>
+                <option value="Licença Maternidade">Licença Maternidade</option>
+                <option value="Licença Paternidade">Licença Paternidade</option>
+                <option value="Licença sem Vencimentos">Licença sem Vencimentos</option>
+                <option value="Afastamento INSS">Afastamento INSS</option>
+                <option value="Suspensão">Suspensão</option>
+                <option value="Capacitação/Treinamento">Capacitação/Treinamento</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+            
+            <!-- Campo adicional quando selecionar "Outros" -->
+            <div class="form-group" v-if="colaboradorEditando.motivo_afastamento === 'Outros'">
+              <label><i class="fas fa-edit"></i> Especifique o motivo</label>
+              <textarea v-model="colaboradorEditando.motivo_outros" 
+                        placeholder="Descreva o motivo específico"
+                        rows="3"></textarea>
+            </div>
           </form>
         </div>
         
@@ -246,7 +280,12 @@ export default {
         cargo_equipe: '',
         cargo_nivel: '',
         setor_id: '',
-        setores_ids: []
+        setores_ids: [],
+        // Campos de afastamento
+        data_afastamento: '',
+        data_retorno: '',
+        motivo_afastamento: '',
+        motivo_outros: ''
       },
       salvando: false,
       // Listas para os selects
@@ -320,6 +359,9 @@ export default {
       console.log('Editando colaborador:', colaborador);
       console.log('Setores disponíveis:', this.setores);
       console.log('Setores do colaborador:', colaborador.setores);
+      console.log('Data afastamento original:', colaborador.data_afastamento);
+      console.log('Data retorno original:', colaborador.data_retorno);
+      console.log('Motivo afastamento original:', colaborador.motivo_afastamento);
       
       // Preenche setor_id - agora os setores vêm como objetos {id, nome}
       let setorId = '';
@@ -353,9 +395,23 @@ export default {
         data_afastamento: colaborador.data_afastamento || '',
         tipo_contrato: colaborador.tipo_contrato || '',
         data_retorno: colaborador.data_retorno || '',
+        // Tratar motivo_afastamento - se começar com "Outros:", separar
+        motivo_afastamento: colaborador.motivo_afastamento && colaborador.motivo_afastamento.startsWith('Outros:') 
+          ? 'Outros' 
+          : colaborador.motivo_afastamento || '',
+        motivo_outros: colaborador.motivo_afastamento && colaborador.motivo_afastamento.startsWith('Outros:')
+          ? colaborador.motivo_afastamento.replace('Outros:', '').trim()
+          : '',
         meta: colaborador.meta?.calc_meta ?? '',
         tipo_pgto: colaborador.meta?.tipo_pgto ?? ''
       };
+      
+      console.log('Objeto colaboradorEditando criado:', this.colaboradorEditando);
+      console.log('Data afastamento formatada:', this.colaboradorEditando.data_afastamento);
+      console.log('Data retorno formatada:', this.colaboradorEditando.data_retorno);
+      console.log('Motivo processado:', this.colaboradorEditando.motivo_afastamento);
+      console.log('Motivo outros:', this.colaboradorEditando.motivo_outros);
+      
       this.showModal = true;
     },
     
@@ -431,6 +487,10 @@ export default {
           data_afastamento: this.colaboradorEditando.data_afastamento || '',
           tipo_contrato: this.colaboradorEditando.tipo_contrato || '',
           data_retorno: this.colaboradorEditando.data_retorno || '',
+          // Combinar motivo padrão com especificação quando for "Outros"
+          motivo_afastamento: this.colaboradorEditando.motivo_afastamento === 'Outros' 
+            ? `Outros: ${this.colaboradorEditando.motivo_outros || ''}`.trim()
+            : this.colaboradorEditando.motivo_afastamento || '',
           // Garantir que meta seja enviada como número (float) e tipo_pgto como string
           meta: this.colaboradorEditando.meta ? parseFloat(this.colaboradorEditando.meta) : null,
           tipo_pgto: this.colaboradorEditando.tipo_pgto || null
@@ -811,6 +871,12 @@ export default {
   border: 1px solid #4ade80;
 }
 
+.status-afastado {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
 .meta-value {
   font-weight: 700;
   color: #059669;
@@ -1001,7 +1067,8 @@ export default {
   font-size: 14px;
 }
 
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 16px 20px;
   border: 2px solid #e2e8f0;
@@ -1013,7 +1080,24 @@ export default {
   font-weight: 500;
 }
 
-.form-group input:focus {
+.form-group textarea {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  background: white;
+  font-weight: 500;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from sqlalchemy.orm import sessionmaker, joinedload
+from datetime import date
 from app.database import engine
 from app.models.funcionario import Funcionario as FuncionarioModel
 from app.models.setor import Setor
@@ -17,11 +18,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def quadro_colaboradores():
     db = SessionLocal()
     funcionarios = db.query(FuncionarioModel).options(
-        joinedload(FuncionarioModel.setores)
+        joinedload(FuncionarioModel.setores),
+        joinedload(FuncionarioModel.sistemas),
+        joinedload(FuncionarioModel.grupos_email),
+        joinedload(FuncionarioModel.grupos_pasta)
     ).all()
     resultado = []
     for funcionario in funcionarios:
         setores = [{'id': s.id, 'nome': s.nome} for s in funcionario.setores]
+        sistemas = [{'id': s.id, 'nome': s.nome} for s in funcionario.sistemas]
+        grupos_email = [{'id': g.id, 'nome': g.nome} for g in funcionario.grupos_email]
+        grupos_pasta = [{'id': g.id, 'nome': g.nome} for g in funcionario.grupos_pasta]
         # Cargo atual
         cargo_vinculo = db.query(FuncionarioCargo).filter_by(funcionario_id=funcionario.id, dt_fim=None).order_by(FuncionarioCargo.dt_inicio.desc()).first()
         cargo = None
@@ -37,13 +44,44 @@ def quadro_colaboradores():
         meta = None
         if meta_vinculo:
             meta = db.query(Meta).filter_by(id=meta_vinculo.meta_id).first()
+        
+        # Calcular status baseado nas datas de afastamento
+        hoje = date.today()
+        status = "Ativo"
+        
+        if funcionario.data_afastamento:
+            # Se tem data de afastamento
+            if funcionario.data_retorno:
+                # Se tem data de retorno
+                if funcionario.data_afastamento <= hoje <= funcionario.data_retorno:
+                    status = "Afastado"
+                elif hoje > funcionario.data_retorno:
+                    status = "Ativo"  # Já retornou
+                else:
+                    status = "Ativo"  # Ainda não se afastou
+            else:
+                # Sem data de retorno - se já passou da data de afastamento, está afastado
+                if funcionario.data_afastamento <= hoje:
+                    status = "Afastado"
+        
         resultado.append({
             'id': funcionario.id,
             'nome': funcionario.nome,
             'sobrenome': funcionario.sobrenome,
             'email': funcionario.email,
             'cpf': funcionario.cpf,
+            'celular': funcionario.celular,
+            'data_admissao': funcionario.data_admissao,
+            'data_inativado': funcionario.data_inativado,
+            'tipo_contrato': funcionario.tipo_contrato,
+            'data_afastamento': funcionario.data_afastamento.strftime('%Y-%m-%d') if funcionario.data_afastamento else None,
+            'data_retorno': funcionario.data_retorno.strftime('%Y-%m-%d') if funcionario.data_retorno else None,
+            'motivo_afastamento': funcionario.motivo_afastamento,
+            'status': status,
             'setores': setores,
+            'sistemas': sistemas,
+            'grupos_email': grupos_email,
+            'grupos_pasta': grupos_pasta,
             'cargo': {
                 'id': cargo.id if cargo else None,
                 'nome': cargo.nome if cargo else None,
