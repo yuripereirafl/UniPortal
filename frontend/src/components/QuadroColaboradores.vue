@@ -1,41 +1,194 @@
 <template>
   <div class="dashboard-colaboradores">
-    <h2 style="color:#1a3760;margin-bottom:18px;">Quadro de Colaboradores</h2>
-    <table class="quadro-table">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Sobrenome</th>
-          <th>Setor</th>
-          <th>Cargo</th>
-          <th>Função</th>
-          <th>Equipe</th>
-          <th>Nível</th>
-          <th>Status</th>
-          <th>Valor da meta</th>
-          <th>Tipo Pgto</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="colab in colaboradores" :key="colab.id">
-          <td>{{ colab.nome }}</td>
-          <td>{{ colab.sobrenome || '-' }}</td>
-          <td>
-            <span v-if="colab.setores && colab.setores.length">
-              {{ colab.setores.join(', ') }}
-            </span>
-            <span v-else>—</span>
-          </td>
-          <td>{{ colab.cargo && colab.cargo.nome ? colab.cargo.nome : '-' }}</td>
-          <td>{{ colab.cargo && colab.cargo.funcao ? colab.cargo.funcao : '-' }}</td>
-          <td>{{ colab.cargo && colab.cargo.equipe ? colab.cargo.equipe : '-' }}</td>
-          <td>{{ colab.cargo && colab.cargo.nivel ? colab.cargo.nivel : '-' }}</td>
-          <td>{{ colab.filial && colab.filial.nome ? colab.filial.nome : '-' }}</td>
-          <td>{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</td>
-          <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="header-section">
+      <h2><i class="fas fa-users"></i> Quadro de Colaboradores</h2>
+      <div class="stats">
+        <span class="stat-item">
+          <i class="fas fa-chart-bar"></i> 
+          Total: {{ colaboradores.length }}
+        </span>
+      </div>
+    </div>
+    
+    <!-- Loading com animação -->
+    <div v-if="carregando" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>Carregando colaboradores...</p>
+    </div>
+    
+    <!-- Erro estilizado -->
+    <div v-else-if="erro" class="error-container">
+      <i class="fas fa-exclamation-triangle"></i>
+      <p>{{ erro }}</p>
+      <button @click="carregarColaboradores" class="btn-retry">Tentar Novamente</button>
+    </div>
+    
+    <!-- Tabela moderna -->
+    <div v-else class="table-container">
+      <table class="modern-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Sobrenome</th>
+            <th>Setor</th>
+            <th>Cargo</th>
+            <th>Função</th>
+            <th>Equipe</th>
+            <th>Nível</th>
+            <th>Status</th>
+            <th>Meta</th>
+            <th>Tipo Pgto</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="colaboradores.length === 0" class="empty-row">
+            <td colspan="11">
+              <div class="empty-state">
+                <i class="fas fa-inbox empty-icon"></i>
+                <p>Nenhum colaborador encontrado</p>
+                <small>Verifique os dados ou tente recarregar</small>
+              </div>
+            </td>
+          </tr>
+          <tr v-for="(colab, index) in colaboradores" :key="colab.id" class="data-row" :class="{ 'row-even': index % 2 === 0 }">
+            <td class="name-cell">
+              <div class="user-info">
+                <div class="avatar">{{ (colab.nome || 'U').charAt(0).toUpperCase() }}</div>
+                <span>{{ colab.nome || '-' }}</span>
+              </div>
+            </td>
+            <td>{{ colab.sobrenome || '-' }}</td>
+            <td>
+              <div class="tag-container">
+                <span v-if="colab.setores && colab.setores.length" 
+                      v-for="setor in colab.setores.slice(0, 2)" 
+                      :key="setor" 
+                      class="tag tag-setor">
+                  {{ setor }}
+                </span>
+                <span v-if="colab.setores && colab.setores.length > 2" class="tag tag-more">
+                  +{{ colab.setores.length - 2 }}
+                </span>
+                <span v-else-if="!colab.setores || colab.setores.length === 0" class="no-data">—</span>
+              </div>
+            </td>
+            <td>
+              <span class="badge badge-cargo">{{ colab.cargo && colab.cargo.nome ? colab.cargo.nome : '-' }}</span>
+            </td>
+            <td>{{ colab.cargo && colab.cargo.funcao ? colab.cargo.funcao : '-' }}</td>
+            <td>
+              <span class="badge badge-equipe">{{ colab.cargo && colab.cargo.equipe ? colab.cargo.equipe : '-' }}</span>
+            </td>
+            <td>
+              <span class="level-indicator" :class="'level-' + (colab.cargo?.nivel || 'none')">
+                {{ colab.cargo && colab.cargo.nivel ? colab.cargo.nivel : '-' }}
+              </span>
+            </td>
+            <td>
+              <span class="status-indicator status-active">{{ colab.filial && colab.filial.nome ? colab.filial.nome : '-' }}</span>
+            </td>
+            <td>
+              <span class="meta-value">{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</span>
+            </td>
+            <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
+            <td>
+              <button @click="editarColaborador(colab)" class="btn-action">
+                <i class="fas fa-edit"></i>
+                <span>Editar</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Modal de Edição -->
+    <div v-if="showModal" class="modal-overlay" @click="fecharModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3><i class="fas fa-user-edit"></i> Editar Colaborador</h3>
+          <button @click="fecharModal" class="btn-close">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <form @submit.prevent="salvarEdicao">
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-user"></i> Nome *</label>
+                <input v-model="colaboradorEditando.nome" type="text" required placeholder="Digite o nome" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-user-tag"></i> Sobrenome *</label>
+                <input v-model="colaboradorEditando.sobrenome" type="text" required placeholder="Digite o sobrenome" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-envelope"></i> Email</label>
+              <input v-model="colaboradorEditando.email" type="email" disabled placeholder="(não editável)" />
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-id-card"></i> CPF</label>
+              <input v-model="colaboradorEditando.cpf" type="text" disabled placeholder="(não editável)" />
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-briefcase"></i> Cargo</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.cargo_id">
+                  <option value="">Selecione um cargo</option>
+                  <option v-for="cargo in cargos" :key="cargo.id" :value="cargo.id">
+                    {{ cargo.nome }} - {{ cargo.funcao }} ({{ cargo.equipe }})
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-building"></i> Setor</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.setor_id">
+                  <option v-for="setor in setores" :key="setor.id" :value="setor.id">
+                    {{ setor.nome }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-money-bill-wave"></i> Tipo de Pagamento</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.tipo_pgto" class="custom-select-tipo-pgto">
+                  <option v-for="opcao in opcoesTipoPgto" :key="opcao" :value="opcao">
+                    <span v-if="opcao === 'Pela unidade'">🔢 Pela unidade</span>
+                    <span v-else-if="opcao === 'Pelo que realizou'">✅ Pelo que realizou</span>
+                    <span v-else>{{ opcao }}</span>
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div v-if="colaboradorEditando.tipo_pgto" class="form-group">
+              <label><i class="fas fa-bullseye"></i> Meta</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.meta" class="custom-select-tipo-pgto">
+                  <option v-for="valor in colaboradorEditando.tipo_pgto === 'Pela unidade' ? opcoesValoresUnidade : opcoesValoresRealizados" :key="valor" :value="valor">
+                    {{ valor }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" @click="fecharModal" class="btn-secondary">
+            <i class="fas fa-times"></i> Cancelar
+          </button>
+          <button type="submit" @click="salvarEdicao" class="btn-primary" :disabled="salvando">
+            <i class="fas fa-save" v-if="!salvando"></i>
+            <i class="fas fa-spinner fa-spin" v-if="salvando"></i>
+            {{ salvando ? 'Salvando...' : 'Salvar Alterações' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -46,51 +199,910 @@ export default {
     return {
       colaboradores: [],
       carregando: false,
-      erro: null
+      erro: null,
+      showModal: false,
+      colaboradorEditando: {
+        id: null,
+        nome: '',
+        sobrenome: '',
+        cargo_id: null,
+        setor_id: '',
+        setores_ids: []
+      },
+      salvando: false,
+      // Listas para os selects
+      cargos: [],
+      setores: [],
+      opcoesTipoPgto: [
+        'Pela unidade',
+        'Pelo que realizou'
+      ],
+      opcoesValoresRealizados: [
+        '0', '0.5', '1'
+      ],
+      opcoesValoresUnidade: [
+        '0', '0.5', '1'
+      ]
     }
   },
   mounted() {
     this.carregarColaboradores();
+    this.carregarCargos();
+    this.carregarSetores();
+  },
+
+  methods: {
+    async carregarSetores() {
+      // Exemplo de fetch, ajuste para sua API
+      const response = await fetch('/setores/');
+      const data = await response.json();
+      // Garante que setores seja array de objetos {setor_id, nome}
+      this.setores = Array.isArray(data)
+        ? data.map(s => typeof s === 'string' ? { setor_id: s, nome: s } : s)
+        : [];
+      console.log('Setores carregados:', this.setores);
+    },
   },
   methods: {
     async carregarColaboradores() {
       this.carregando = true;
       this.erro = null;
       try {
-        const response = await fetch('http://localhost:8000/quadro_colaboradores/');
-        this.colaboradores = await response.json();
+        console.log('Buscando dados do backend...');
+    const response = await fetch('/quadro_colaboradores/');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Dados recebidos:', data);
+        this.colaboradores = data;
+        
+        if (data.length === 0) {
+          console.log('Nenhum colaborador encontrado');
+        }
       } catch (e) {
-        this.erro = 'Erro ao carregar colaboradores.';
+        console.error('Erro ao carregar colaboradores:', e);
+        this.erro = 'Erro ao carregar colaboradores: ' + e.message;
         this.colaboradores = [];
       }
       this.carregando = false;
+    },
+    editarColaborador(colaborador) {
+  console.log('Editando colaborador:', colaborador);
+  console.log('Setores disponíveis:', this.setores);
+      // Preencher todos os campos esperados pelo backend
+      console.log('Setores do colaborador:', colaborador.setores);
+      let setorId = '';
+      if (colaborador.setores && colaborador.setores.length > 0) {
+        if (typeof colaborador.setores[0] === 'object' && colaborador.setores[0].setor_id) {
+          setorId = colaborador.setores[0].setor_id;
+        } else if (typeof colaborador.setores[0] === 'string') {
+          // Busca o id pelo nome no array de setores disponíveis, normalizando
+          const setorNomeColab = colaborador.setores[0].toLowerCase().trim();
+          const setorObj = this.setores.find(s => s.nome.toLowerCase().trim() === setorNomeColab);
+          setorId = setorObj ? setorObj.setor_id : '';
+        }
+      }
+      console.log('Setor selecionado para o modal:', setorId);
+      this.colaboradorEditando = {
+        // ...existing code...
+        setor_id: setorId,
+        id: colaborador.id,
+        nome: colaborador.nome || '',
+        sobrenome: colaborador.sobrenome || '',
+        cargo_id: colaborador.cargo?.id || null,
+  // Preenche setor_id como id do setor, para select único
+  setor_id: colaborador.setores && colaborador.setores.length > 0 ? colaborador.setores[0].id : '',
+        sistemas_ids: colaborador.sistemas?.map(s => s.id) || [],
+        grupos_email_ids: colaborador.grupos_email?.map(g => g.id) || [],
+        grupos_pasta_ids: colaborador.grupos_pasta?.map(g => g.id) || [],
+        celular: colaborador.celular || '',
+        email: colaborador.email ? colaborador.email : '',
+        data_admissao: colaborador.data_admissao || '',
+        data_inativado: colaborador.data_inativado || '',
+        cpf: colaborador.cpf ? colaborador.cpf : '',
+        data_afastamento: colaborador.data_afastamento || '',
+        tipo_contrato: colaborador.tipo_contrato || '',
+        data_retorno: colaborador.data_retorno || '',
+        meta: colaborador.meta?.calc_meta ?? '',
+        tipo_pgto: colaborador.meta?.tipo_pgto ?? ''
+      };
+      this.showModal = true;
+    },
+    
+    fecharModal() {
+      this.showModal = false;
+      this.colaboradorEditando = {
+        id: null,
+        nome: '',
+        sobrenome: '',
+        cargo_id: null,
+        setor_id: '',
+        setores_ids: []
+      };
+    },
+    
+    async salvarEdicao() {
+      this.salvando = true;
+      try {
+        // Fazer PUT para atualizar o funcionário
+        if (!this.colaboradorEditando.email || this.colaboradorEditando.email.trim() === '') {
+          alert('O campo email é obrigatório!');
+          this.salvando = false;
+          return;
+        }
+        const payload = {
+          nome: this.colaboradorEditando.nome || '',
+          sobrenome: this.colaboradorEditando.sobrenome || '',
+          cargo_id: this.colaboradorEditando.cargo_id || null,
+          setor_id: this.colaboradorEditando.setor_id || null,
+          sistemas_ids: this.colaboradorEditando.sistemas_ids || [],
+          grupos_email_ids: this.colaboradorEditando.grupos_email_ids || [],
+          grupos_pasta_ids: this.colaboradorEditando.grupos_pasta_ids || [],
+          celular: this.colaboradorEditando.celular || '',
+          email: this.colaboradorEditando.email || '',
+          cpf: this.colaboradorEditando.cpf || '',
+          data_admissao: this.colaboradorEditando.data_admissao || '',
+          data_inativado: this.colaboradorEditando.data_inativado || '',
+          data_afastamento: this.colaboradorEditando.data_afastamento || '',
+          tipo_contrato: this.colaboradorEditando.tipo_contrato || '',
+          data_retorno: this.colaboradorEditando.data_retorno || '',
+          meta: this.colaboradorEditando.meta,
+          tipo_pgto: this.colaboradorEditando.tipo_pgto
+        };
+        console.log('Payload enviado no PUT:', payload);
+        const response = await fetch(`/funcionarios/${this.colaboradorEditando.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao salvar: ${response.status}`);
+        }
+        
+        // Recarregar a tabela
+        await this.carregarColaboradores();
+        
+        // Fechar modal
+        this.fecharModal();
+        
+        console.log('Colaborador atualizado com sucesso');
+        
+      } catch (error) {
+        console.error('Erro ao salvar colaborador:', error);
+        alert('Erro ao salvar colaborador: ' + error.message);
+      }
+      this.salvando = false;
+    },
+    
+    // Métodos para carregar listas de opções
+    async carregarCargos() {
+      try {
+    const response = await fetch('/cargos/');
+        this.cargos = await response.json();
+      } catch (e) {
+        console.error('Erro ao carregar cargos:', e);
+      }
+    },
+    
+    async carregarSetores() {
+      try {
+    const response = await fetch('/setores/');
+        this.setores = await response.json();
+      } catch (e) {
+        console.error('Erro ao carregar setores:', e);
+      }
     }
   }
 }
 </script>
 
 <style scoped>
+/* Import Font Awesome se não estiver já incluído */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+
 .dashboard-colaboradores {
-  margin-top: 32px;
+  padding: 24px;
+  background: #f8fafc;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
-.quadro-table {
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.header-section h2 {
+  color: #1e293b;
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-section h2 i {
+  color: #3b82f6;
+  font-size: 24px;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-item {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.loading-container {
+  text-align: center;
+  padding: 80px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-container {
+  text-align: center;
+  padding: 48px;
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+  border: 2px solid #f87171;
+  border-radius: 16px;
+  color: #dc2626;
+}
+
+.error-container i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.btn-retry {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 20px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+.btn-retry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
+}
+
+.table-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.modern-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 24px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
 }
-.quadro-table th, .quadro-table td {
-  border-bottom: 2px solid #fbc02d;
-  padding: 10px 8px;
+
+.modern-table th {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: white;
+  padding: 20px 16px;
   text-align: left;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
-.quadro-table th {
-  color: #1a3760;
-  font-weight: bold;
+
+.modern-table th i {
+  margin-right: 8px;
+  opacity: 0.9;
 }
-.quadro-table td {
-  color: #222;
+
+.modern-table td {
+  padding: 18px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+  vertical-align: middle;
+  transition: all 0.2s ease;
+}
+
+.data-row:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.row-even {
+  background: #fafbfc;
+}
+
+.name-cell {
+  min-width: 200px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tag-setor {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.tag-more {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-cargo {
+  background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%);
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.badge-equipe {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.level-indicator {
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.level-1, .level-junior {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.level-2, .level-pleno {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  color: #4338ca;
+  border: 1px solid #818cf8;
+}
+
+.level-3, .level-senior {
+  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  color: #be185d;
+  border: 1px solid #f472b6;
+}
+
+.level-none {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.status-indicator {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-active {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #166534;
+  border: 1px solid #4ade80;
+}
+
+.meta-value {
+  font-weight: 700;
+  color: #059669;
+  font-size: 15px;
+}
+
+.no-data {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 13px;
+}
+
+.btn-action {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  min-width: 100px;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.btn-action:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+}
+
+.empty-row td {
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.empty-state {
+  color: #6b7280;
+}
+
+.empty-icon {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #374151;
+}
+
+.empty-state small {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+/* Modal Styles Modernos e Profissionais */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
+  animation: slideUp 0.4s ease;
+  border: 1px solid #e2e8f0;
+}
+
+@keyframes slideUp {
+  from { 
+    transform: translateY(60px) scale(0.9);
+    opacity: 0;
+  }
+  to { 
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 36px;
+  border-bottom: 2px solid #e2e8f0;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 20px 20px 0 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-header h3 i {
+  color: #3b82f6;
+  font-size: 20px;
+}
+
+.btn-close {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-close:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: scale(1.1) rotate(90deg);
+}
+
+.modal-body {
+  padding: 36px;
+  background: #fafbfc;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group label i {
+  color: #3b82f6;
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  background: white;
+  font-weight: 500;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background: #fafbfc;
+  transform: translateY(-1px);
+}
+
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper::after {
+  content: '\f107';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.select-wrapper.multi::after {
+  display: none;
+}
+
+.select-wrapper select {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: white;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.select-wrapper select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background: #fafbfc;
+  transform: translateY(-1px);
+}
+
+.select-wrapper.multi select {
+  height: 140px;
+  padding: 12px;
+}
+
+.select-wrapper.multi select option {
+  padding: 10px;
+  margin: 2px 0;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.select-wrapper.multi select option:checked {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.form-group small i {
+  color: #3b82f6;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 28px 36px;
+  border-top: 2px solid #e2e8f0;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 0 0 20px 20px;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #64748b, #475569);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.25);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #475569, #334155);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(100, 116, 139, 0.35);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  min-width: 180px;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857, #065f46);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
+}
+
+.btn-primary:disabled {
+  background: linear-gradient(135deg, #d1d5db, #9ca3af);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.fa-spin {
+  animation: fa-spin 1s infinite linear;
+}
+
+@keyframes fa-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Estilos personalizados para o select de tipo de pagamento */
+.custom-select-tipo-pgto {
+  position: relative;
+  padding-left: 40px;
+  padding-right: 40px;
+  height: 48px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  appearance: none;
+  transition: all 0.3s ease;
+}
+
+.custom-select-tipo-pgto:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background: #fafbfc;
+}
+
+.custom-select-tipo-pgto option {
+  padding: 10px;
+  margin: 2px 0;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* Estilização personalizada para o select de tipo de pagamento */
+.custom-select-tipo-pgto {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%);
+  color: #0369a1;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  appearance: none;
+  cursor: pointer;
+}
+.custom-select-tipo-pgto:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background: #fafbfc;
+}
+.custom-select-tipo-pgto option {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px;
+  background: #f0f9ff;
+  color: #0369a1;
 }
 </style>
