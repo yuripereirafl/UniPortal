@@ -1,14 +1,14 @@
 from ..models.funcionario_cargo import FuncionarioCargo
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, date
 from ..models.funcionario import Funcionario as FuncionarioModel
 from ..models.setor import Setor
 from ..models.sistema import Sistema as SistemaModel
 from ..models.grupo_email import GrupoEmail
 from ..models.cargo import Cargo
 from ..models.grupo_pasta import GrupoPasta
-from ..schemas.funcionario import FuncionarioCreate, Funcionario as FuncionarioSchema
+from ..schemas.funcionario import FuncionarioCreate, Funcionario as FuncionarioSchema, FuncionarioUpdate
 from ..schemas.sistema import Sistema as SistemaSchema
 from ..schemas.setor import SetorOut
 from ..schemas.grupo_email import GrupoEmailOut
@@ -112,107 +112,135 @@ def get_funcionario_sistemas(id: int):
     return sistemas
 
 @router.put('/funcionarios/{id}', response_model=FuncionarioSchema)
-def atualizar_funcionario(id: int, funcionario: FuncionarioCreate):
+def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
     db = SessionLocal()
     db_funcionario = db.query(FuncionarioModel).filter(FuncionarioModel.id == id).first()
     if not db_funcionario:
         db.close()
         raise HTTPException(status_code=404, detail='Funcionário não encontrado')
-    db_funcionario.nome = funcionario.nome
-    db_funcionario.sobrenome = funcionario.sobrenome
-    db_funcionario.celular = funcionario.celular
-    db_funcionario.email = funcionario.email
-    db_funcionario.cpf = funcionario.cpf
-    db_funcionario.tipo_contrato = funcionario.tipo_contrato
-    # Atualiza vínculo de cargo via FuncionarioCargo
-    if funcionario.cargo_id:
+    
+    # Só atualiza campos que foram enviados e não estão vazios
+    if funcionario.nome and funcionario.nome.strip():
+        db_funcionario.nome = funcionario.nome
+    if funcionario.sobrenome and funcionario.sobrenome.strip():
+        db_funcionario.sobrenome = funcionario.sobrenome
+    if funcionario.celular is not None and funcionario.celular != '':
+        db_funcionario.celular = funcionario.celular
+    if funcionario.email is not None and funcionario.email != '':
+        db_funcionario.email = funcionario.email
+    if funcionario.cpf is not None and funcionario.cpf != '':
+        db_funcionario.cpf = funcionario.cpf
+    if funcionario.tipo_contrato is not None and funcionario.tipo_contrato != '':
+        db_funcionario.tipo_contrato = funcionario.tipo_contrato
+    
+    # Atualiza vínculo de cargo - prioriza campos separados se fornecidos
+    cargo_obj = None
+    
+    # Se foram fornecidos campos separados, usa eles (prioridade)
+    if any([funcionario.cargo_nome, funcionario.cargo_funcao, funcionario.cargo_equipe, funcionario.cargo_nivel]):
+        # Busca cargo existente com esses atributos
+        query = db.query(Cargo)
+        if funcionario.cargo_nome:
+            query = query.filter(Cargo.nome == funcionario.cargo_nome)
+        if funcionario.cargo_funcao:
+            query = query.filter(Cargo.funcao == funcionario.cargo_funcao)
+        if funcionario.cargo_equipe:
+            query = query.filter(Cargo.equipe == funcionario.cargo_equipe)
+        if funcionario.cargo_nivel:
+            query = query.filter(Cargo.nivel == funcionario.cargo_nivel)
+            
+        cargo_obj = query.first()
+        
+        # Se não encontrou, cria novo cargo
+        if not cargo_obj:
+            cargo_obj = Cargo(
+                nome=funcionario.cargo_nome,
+                funcao=funcionario.cargo_funcao,
+                equipe=funcionario.cargo_equipe,
+                nivel=funcionario.cargo_nivel
+            )
+            db.add(cargo_obj)
+            db.flush()
+            db.refresh(cargo_obj)
+    
+    # Caso contrário, se foi fornecido cargo_id, usa ele
+    elif funcionario.cargo_id:
         cargo_obj = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
-        if cargo_obj:
-            dt_inicio = datetime.now().date()
-            
-            # Verifica se já existe um vínculo ativo com o mesmo cargo na mesma data
-            vinculo_ativo_existente = db.query(FuncionarioCargo).filter_by(
-                funcionario_id=db_funcionario.id,
-                cargo_id=cargo_obj.id,
-                dt_inicio=dt_inicio,
-                dt_fim=None
-            ).first()
-            
-            if not vinculo_ativo_existente:
-                # Fecha outros vínculos ativos (com cargos diferentes)
-                vinculos_ativos = db.query(FuncionarioCargo).filter_by(
-                    funcionario_id=db_funcionario.id,
-                    dt_fim=None
-                ).all()
-                
-                for vinculo in vinculos_ativos:
-                    vinculo.dt_fim = dt_inicio
-                
-                # Cria novo vínculo apenas se não existir um igual
-                novo_vinculo = FuncionarioCargo(
-                    funcionario_id=db_funcionario.id,
-                    cargo_id=cargo_obj.id,
-                    dt_inicio=dt_inicio,
-                    cargo_nome=cargo_obj.nome,
-                    cargo_nivel=getattr(cargo_obj, 'nivel', None),
-                    cargo_funcao=getattr(cargo_obj, 'funcao', None),
-                    cargo_equipe=getattr(cargo_obj, 'equipe', None)
-                )
-                db.add(novo_vinculo)
-                db.commit()
-    # Atualiza data de admissão
-    # Garante que data_admissao seja string
-    if hasattr(funcionario, 'data_admissao') and funcionario.data_admissao not in ('', None):
-        db_funcionario.data_admissao = str(funcionario.data_admissao)
-    else:
-        db_funcionario.data_admissao = None
-    # Atualiza vínculo de cargo
-    cargo_obj = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
+    
+    # Se encontrou ou criou um cargo, cria o vínculo
     if cargo_obj:
-        dt_inicio = datetime.now().date()
-        vinculo_existente = db.query(FuncionarioCargo).filter_by(
+        dt_inicio = date.today()
+        
+        # Verifica se já existe um vínculo ativo com o mesmo cargo na mesma data
+        vinculo_ativo_existente = db.query(FuncionarioCargo).filter_by(
             funcionario_id=db_funcionario.id,
             cargo_id=cargo_obj.id,
-            dt_inicio=dt_inicio
+            dt_inicio=dt_inicio,
+            dt_fim=None
         ).first()
-        if not vinculo_existente:
+        
+        if not vinculo_ativo_existente:
+            # Fecha outros vínculos ativos (com cargos diferentes) usando update direto
+            db.query(FuncionarioCargo).filter_by(
+                funcionario_id=db_funcionario.id,
+                dt_fim=None
+            ).update({FuncionarioCargo.dt_fim: dt_inicio})
+            
+            # Cria novo vínculo apenas se não existir um igual
             novo_vinculo = FuncionarioCargo(
                 funcionario_id=db_funcionario.id,
                 cargo_id=cargo_obj.id,
                 dt_inicio=dt_inicio,
                 cargo_nome=cargo_obj.nome,
-                cargo_nivel=cargo_obj.nivel,
-                cargo_funcao=cargo_obj.funcao,
-                cargo_equipe=cargo_obj.equipe
+                cargo_nivel=getattr(cargo_obj, 'nivel', None),
+                cargo_funcao=getattr(cargo_obj, 'funcao', None),
+                cargo_equipe=getattr(cargo_obj, 'equipe', None)
             )
             db.add(novo_vinculo)
-    db_funcionario.data_afastamento = funcionario.data_afastamento if funcionario.data_afastamento not in ('', None) else None
-    db_funcionario.data_retorno = funcionario.data_retorno if funcionario.data_retorno not in ('', None) else None
-    if funcionario.data_inativado not in ('', None):
+            db.flush()  # Usa flush ao invés de commit aqui
+    
+    # Só atualiza datas se foram fornecidas e não estão vazias
+    if hasattr(funcionario, 'data_admissao') and funcionario.data_admissao not in ('', None):
+        db_funcionario.data_admissao = str(funcionario.data_admissao)
+    
+    if hasattr(funcionario, 'data_afastamento') and funcionario.data_afastamento not in ('', None):
+        db_funcionario.data_afastamento = funcionario.data_afastamento
+    
+    if hasattr(funcionario, 'data_retorno') and funcionario.data_retorno not in ('', None):
+        db_funcionario.data_retorno = funcionario.data_retorno
+    
+    if hasattr(funcionario, 'data_inativado') and funcionario.data_inativado not in ('', None):
         db_funcionario.data_inativado = str(funcionario.data_inativado)
-    else:
-        db_funcionario.data_inativado = None
-    if funcionario.grupos_email_ids:
-        grupos = db.query(GrupoEmail).filter(GrupoEmail.id.in_(funcionario.grupos_email_ids)).all()
-        db_funcionario.grupos_email = grupos
-    else:
-        db_funcionario.grupos_email = []
-    if hasattr(funcionario, 'grupos_pasta_ids') and funcionario.grupos_pasta_ids:
-        grupos_pasta = db.query(GrupoPasta).filter(GrupoPasta.id.in_(funcionario.grupos_pasta_ids)).all()
-        db_funcionario.grupos_pasta = grupos_pasta
-    else:
-        db_funcionario.grupos_pasta = []
-    if funcionario.setores_ids:
-        setores = db.query(Setor).filter(Setor.id.in_(funcionario.setores_ids)).all()
-        db_funcionario.setores = setores
-    else:
-        db_funcionario.setores = []
-    # Atualiza sistemas
-    if funcionario.sistemas_ids:
-        sistemas = db.query(SistemaModel).filter(SistemaModel.id.in_(funcionario.sistemas_ids)).all()
-        db_funcionario.sistemas = sistemas
-    else:
-        db_funcionario.sistemas = []
+    
+    # Atualiza relacionamentos apenas se fornecidos
+    # Só atualiza relacionamentos se foram explicitamente fornecidos
+    if funcionario.grupos_email_ids is not None:
+        if funcionario.grupos_email_ids:
+            grupos = db.query(GrupoEmail).filter(GrupoEmail.id.in_(funcionario.grupos_email_ids)).all()
+            db_funcionario.grupos_email = grupos
+        else:
+            db_funcionario.grupos_email = []
+    
+    if hasattr(funcionario, 'grupos_pasta_ids') and funcionario.grupos_pasta_ids is not None:
+        if funcionario.grupos_pasta_ids:
+            grupos_pasta = db.query(GrupoPasta).filter(GrupoPasta.id.in_(funcionario.grupos_pasta_ids)).all()
+            db_funcionario.grupos_pasta = grupos_pasta
+        else:
+            db_funcionario.grupos_pasta = []
+    
+    if funcionario.setores_ids is not None:
+        if funcionario.setores_ids:
+            setores = db.query(Setor).filter(Setor.id.in_(funcionario.setores_ids)).all()
+            db_funcionario.setores = setores
+        else:
+            db_funcionario.setores = []
+    
+    if funcionario.sistemas_ids is not None:
+        if funcionario.sistemas_ids:
+            sistemas = db.query(SistemaModel).filter(SistemaModel.id.in_(funcionario.sistemas_ids)).all()
+            db_funcionario.sistemas = sistemas
+        else:
+            db_funcionario.sistemas = []
     # Atualiza meta e tipo_pgto
     if hasattr(funcionario, 'meta') and funcionario.meta is not None and hasattr(funcionario, 'tipo_pgto') and funcionario.tipo_pgto is not None:
         try:
@@ -224,39 +252,39 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioCreate):
             if not meta_obj:
                 meta_obj = Meta(calc_meta=meta_valor, tipo_pgto=funcionario.tipo_pgto)
                 db.add(meta_obj)
-                db.commit()
+                db.flush()  # Usa flush ao invés de commit
                 db.refresh(meta_obj)
             
-            # Verifica se já existe um vínculo ativo com a mesma meta
-            from datetime import date
+            # Lógica mais simples e robusta: remove todos os vínculos de hoje e cria novo
             dt_inicio = date.today()
-            vinculo_ativo_existente = db.query(FuncionarioMeta).filter_by(
-                funcionario_id=db_funcionario.id, 
-                meta_id=meta_obj.id,
-                dt_inicio=dt_inicio,
-                dt_fim=None
-            ).first()
             
-            if not vinculo_ativo_existente:
-                # Fecha outros vínculos ativos (com metas diferentes)
-                vinculos_ativos = db.query(FuncionarioMeta).filter_by(
-                    funcionario_id=db_funcionario.id, 
-                    dt_fim=None
-                ).all()
-                
-                for vinculo in vinculos_ativos:
-                    vinculo.dt_fim = dt_inicio
-                
-                db.commit()
-                
-                # Cria novo vínculo apenas se não existir um igual
-                novo_vinculo = FuncionarioMeta(
-                    funcionario_id=db_funcionario.id, 
-                    meta_id=meta_obj.id, 
-                    dt_inicio=dt_inicio
-                )
-                db.add(novo_vinculo)
-                db.commit()
+            # Remove TODOS os vínculos ativos de hoje para este funcionário (se existirem)
+            db.query(FuncionarioMeta).filter_by(
+                funcionario_id=db_funcionario.id,
+                dt_inicio=dt_inicio
+            ).delete()
+            
+            # Fecha vínculos anteriores (com data anterior a hoje)
+            from datetime import timedelta
+            data_fechamento = dt_inicio - timedelta(days=1)
+            db.query(FuncionarioMeta).filter_by(
+                funcionario_id=db_funcionario.id,
+                dt_fim=None
+            ).filter(FuncionarioMeta.dt_inicio < dt_inicio).update({
+                FuncionarioMeta.dt_fim: data_fechamento
+            })
+            
+            # Força flush das operações anteriores
+            db.flush()
+            
+            # Agora cria o novo vínculo (garantido sem duplicação)
+            novo_vinculo = FuncionarioMeta(
+                funcionario_id=db_funcionario.id, 
+                meta_id=meta_obj.id, 
+                dt_inicio=dt_inicio
+            )
+            db.add(novo_vinculo)
+            db.flush()
         except (ValueError, TypeError) as e:
             db.close()
             raise HTTPException(status_code=422, detail=f"Valor de meta inválido: {funcionario.meta}. Deve ser um número (0, 0.5 ou 1).")
@@ -272,7 +300,7 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioCreate):
         if vinculos_ativos:
             cargo_nome = vinculos_ativos[0].cargo.nome
         else:
-            vinculo_recente = max(db_funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or datetime.min)
+            vinculo_recente = max(db_funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
             cargo_nome = vinculo_recente.cargo.nome
     funcionario_schema = FuncionarioSchema.model_validate({
         **db_funcionario.__dict__,
@@ -314,7 +342,7 @@ def list_funcionarios():
             if vinculos_ativos:
                 cargo_nome = vinculos_ativos[0].cargo.nome
             else:
-                vinculo_recente = max(funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or datetime.min)
+                vinculo_recente = max(funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
                 cargo_nome = vinculo_recente.cargo.nome
         funcionario_schema = FuncionarioSchema.model_validate({
             **funcionario.__dict__,

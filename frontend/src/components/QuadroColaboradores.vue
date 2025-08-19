@@ -131,13 +131,47 @@
               <label><i class="fas fa-id-card"></i> CPF</label>
               <input v-model="colaboradorEditando.cpf" type="text" disabled placeholder="(não editável)" />
             </div>
+            <!-- Campos separados do cargo -->
             <div class="form-group">
-              <label><i class="fas fa-briefcase"></i> Cargo</label>
+              <label><i class="fas fa-briefcase"></i> Nome do Cargo</label>
               <div class="select-wrapper">
-                <select v-model="colaboradorEditando.cargo_id">
-                  <option value="">Selecione um cargo</option>
-                  <option v-for="cargo in cargos" :key="cargo.id" :value="cargo.id">
-                    {{ cargo.nome }} - {{ cargo.funcao }} ({{ cargo.equipe }})
+                <select v-model="colaboradorEditando.cargo_nome">
+                  <option value="">Selecione o nome do cargo</option>
+                  <option v-for="nome in opcoesCargoSeparadas.nomes" :key="nome" :value="nome">
+                    {{ nome }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-user-tag"></i> Função</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.cargo_funcao">
+                  <option value="">Selecione a função</option>
+                  <option v-for="funcao in opcoesCargoSeparadas.funcoes" :key="funcao" :value="funcao">
+                    {{ funcao }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-users"></i> Equipe</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.cargo_equipe">
+                  <option value="">Selecione a equipe</option>
+                  <option v-for="equipe in opcoesCargoSeparadas.equipes" :key="equipe" :value="equipe">
+                    {{ equipe }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-layer-group"></i> Nível</label>
+              <div class="select-wrapper">
+                <select v-model="colaboradorEditando.cargo_nivel">
+                  <option value="">Selecione o nível</option>
+                  <option v-for="nivel in opcoesCargoSeparadas.niveis" :key="nivel" :value="nivel">
+                    {{ nivel }}
                   </option>
                 </select>
               </div>
@@ -206,6 +240,11 @@ export default {
         nome: '',
         sobrenome: '',
         cargo_id: null,
+        // Campos separados do cargo
+        cargo_nome: '',
+        cargo_funcao: '',
+        cargo_equipe: '',
+        cargo_nivel: '',
         setor_id: '',
         setores_ids: []
       },
@@ -213,6 +252,13 @@ export default {
       // Listas para os selects
       cargos: [],
       setores: [],
+      // Opções separadas do cargo para os selects
+      opcoesCargoSeparadas: {
+        nomes: [],
+        funcoes: [],
+        equipes: [],
+        niveis: []
+      },
       opcoesTipoPgto: [
         'Pela unidade',
         'Pelo que realizou'
@@ -229,6 +275,7 @@ export default {
     this.carregarColaboradores();
     this.carregarCargos();
     this.carregarSetores();
+    this.carregarOpcoesCargoSeparadas();
   },
 
   methods: {
@@ -288,6 +335,11 @@ export default {
         nome: colaborador.nome || '',
         sobrenome: colaborador.sobrenome || '',
         cargo_id: colaborador.cargo?.id || null,
+        // Campos separados do cargo
+        cargo_nome: colaborador.cargo?.nome || '',
+        cargo_funcao: colaborador.cargo?.funcao || '',
+        cargo_equipe: colaborador.cargo?.equipe || '',
+        cargo_nivel: colaborador.cargo?.nivel || '',
         // Preenche setor_id como id do setor, para select único
         setor_id: setorId,
         sistemas_ids: colaborador.sistemas?.map(s => s.id) || [],
@@ -314,6 +366,11 @@ export default {
         nome: '',
         sobrenome: '',
         cargo_id: null,
+        // Campos separados do cargo
+        cargo_nome: '',
+        cargo_funcao: '',
+        cargo_equipe: '',
+        cargo_nivel: '',
         setor_id: '',
         setores_ids: []
       };
@@ -354,7 +411,13 @@ export default {
         const payload = {
           nome: this.colaboradorEditando.nome.trim(),
           sobrenome: this.colaboradorEditando.sobrenome.trim(),
-          cargo_id: this.colaboradorEditando.cargo_id || null,
+          // Não enviar cargo_id quando usando campos separados
+          // cargo_id: this.colaboradorEditando.cargo_id || null,
+          // Campos separados do cargo
+          cargo_nome: this.colaboradorEditando.cargo_nome || null,
+          cargo_funcao: this.colaboradorEditando.cargo_funcao || null,
+          cargo_equipe: this.colaboradorEditando.cargo_equipe || null,
+          cargo_nivel: this.colaboradorEditando.cargo_nivel || null,
           // Backend espera setores_ids como array
           setores_ids: this.colaboradorEditando.setor_id ? [parseInt(this.colaboradorEditando.setor_id)] : [],
           sistemas_ids: this.colaboradorEditando.sistemas_ids || [],
@@ -372,6 +435,9 @@ export default {
           meta: this.colaboradorEditando.meta ? parseFloat(this.colaboradorEditando.meta) : null,
           tipo_pgto: this.colaboradorEditando.tipo_pgto || null
         };
+
+        console.log('Payload sendo enviado:', payload);
+        console.log('Dados do colaborador sendo editado:', this.colaboradorEditando);
         console.log('=== PAYLOAD DEBUG ===');
         console.log('Payload completo enviado no PUT:', JSON.stringify(payload, null, 2));
         console.log('Tipo da meta:', typeof payload.meta, 'Valor:', payload.meta);
@@ -430,6 +496,30 @@ export default {
         this.setores = await response.json();
       } catch (e) {
         console.error('Erro ao carregar setores:', e);
+      }
+    },
+    
+    async carregarOpcoesCargoSeparadas() {
+      try {
+        // Carrega opções distintas de cada campo
+        const [nomes, funcoes, equipes, niveis] = await Promise.all([
+          fetch('/cargos/nomes').then(r => r.json()),
+          fetch('/cargos/funcoes').then(r => r.json()),
+          fetch('/cargos/equipes').then(r => r.json()),
+          fetch('/cargos/niveis').then(r => r.json())
+        ]);
+        
+        // Popula o objeto opcoesCargoSeparadas
+        this.opcoesCargoSeparadas = {
+          nomes,
+          funcoes,
+          equipes,
+          niveis
+        };
+        
+        console.log('Opções de cargo carregadas:', this.opcoesCargoSeparadas);
+      } catch (e) {
+        console.error('Erro ao carregar opções de cargo:', e);
       }
     }
   }

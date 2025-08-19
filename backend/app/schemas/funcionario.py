@@ -29,6 +29,31 @@ class FuncionarioBase(BaseModel):
 class FuncionarioCreate(FuncionarioBase):
     pass
 
+class FuncionarioUpdate(BaseModel):
+    """Schema para atualizações - todos os campos são opcionais"""
+    cargo_id: Optional[int] = None
+    # Campos separados do cargo
+    cargo_nome: Optional[str] = None
+    cargo_funcao: Optional[str] = None
+    cargo_equipe: Optional[str] = None
+    cargo_nivel: Optional[str] = None
+    nome: Optional[str] = None
+    sobrenome: Optional[str] = None
+    setores_ids: Optional[List[int]] = None
+    sistemas_ids: Optional[List[int]] = None
+    grupos_email_ids: Optional[List[int]] = None
+    grupos_pasta_ids: Optional[List[int]] = None
+    celular: Optional[str] = None
+    email: Optional[str] = None
+    data_admissao: Optional[str] = None
+    data_inativado: Optional[str] = None
+    cpf: Optional[str] = None
+    data_afastamento: Optional[str] = None
+    tipo_contrato: Optional[str] = None
+    data_retorno: Optional[str] = None
+    meta: Optional[Union[float, str]] = None
+    tipo_pgto: Optional[str] = None
+
 class Funcionario(FuncionarioBase):
     id: int
     setores: List[SetorOut] = []
