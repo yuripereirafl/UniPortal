@@ -95,10 +95,18 @@
                   'status-indicator',
                   colab.data_inativado
                     ? 'status-inativo'
-                    : (colab.status === 'Ativo' ? 'status-active' : 'status-afastado')
+                    : (colab.data_afastamento
+                        ? (colab.data_retorno ? 'status-active' : 'status-afastado')
+                        : (colab.status === 'Ativo' ? 'status-active' : 'status-afastado'))
                 ]"
               >
-                {{ colab.data_inativado ? 'Inativo' : (colab.status || 'Ativo') }}
+                {{
+                  colab.data_inativado
+                    ? 'Inativo'
+                    : (colab.data_afastamento
+                        ? (colab.data_retorno ? 'Ativo' : 'Afastado')
+                        : (colab.status || 'Ativo'))
+                }}
               </span>
             </td>
             <td>
