@@ -28,9 +28,13 @@
       <table class="modern-table">
         <thead>
           <tr>
-            <th>Nome</th>
+            <th @click="ordenarPor('nome')" style="cursor:pointer">
+              Nome <i class="fas fa-sort"></i>
+            </th>
             <th>Sobrenome</th>
-            <th>Setor</th>
+            <th @click="ordenarPor('unidade')" style="cursor:pointer">
+              Unidade <i class="fas fa-sort"></i>
+            </th>
             <th>Cargo</th>
             <th>Função</th>
             <th>Equipe</th>
@@ -42,7 +46,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="colaboradores.length === 0" class="empty-row">
+          <tr v-if="colaboradoresOrdenados.length === 0" class="empty-row">
             <td colspan="11">
               <div class="empty-state">
                 <i class="fas fa-inbox empty-icon"></i>
@@ -51,7 +55,7 @@
               </div>
             </td>
           </tr>
-          <tr v-for="(colab, index) in colaboradores" :key="colab.id" class="data-row" :class="{ 'row-even': index % 2 === 0 }">
+          <tr v-for="(colab, index) in colaboradoresOrdenados" :key="colab.id" class="data-row" :class="{ 'row-even': index % 2 === 0 }">
             <td class="name-cell">
               <div class="user-info">
                 <div class="avatar">{{ (colab.nome || 'U').charAt(0).toUpperCase() }}</div>
@@ -86,8 +90,15 @@
               </span>
             </td>
             <td>
-              <span :class="['status-indicator', colab.status === 'Ativo' ? 'status-active' : 'status-afastado']">
-                {{ colab.status || 'Ativo' }}
+              <span
+                :class="[
+                  'status-indicator',
+                  colab.data_inativado
+                    ? 'status-inativo'
+                    : (colab.status === 'Ativo' ? 'status-active' : 'status-afastado')
+                ]"
+              >
+                {{ colab.data_inativado ? 'Inativo' : (colab.status || 'Ativo') }}
               </span>
             </td>
             <td>
@@ -118,11 +129,11 @@
             <div class="form-row">
               <div class="form-group">
                 <label><i class="fas fa-user"></i> Nome *</label>
-                <input v-model="colaboradorEditando.nome" type="text" required placeholder="Digite o nome" />
+                <input v-model="colaboradorEditando.nome" type="text" disabled placeholder="(não editável)" />
               </div>
               <div class="form-group">
                 <label><i class="fas fa-user-tag"></i> Sobrenome *</label>
-                <input v-model="colaboradorEditando.sobrenome" type="text" required placeholder="Digite o sobrenome" />
+                <input v-model="colaboradorEditando.sobrenome" type="text" disabled placeholder="(não editável)" />
               </div>
             </div>
             <div class="form-group">
@@ -179,7 +190,7 @@
               </div>
             </div>
             <div class="form-group">
-              <label><i class="fas fa-building"></i> Setor</label>
+              <label><i class="fas fa-building"></i> Unidade</label>
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.setor_id">
                   <option v-for="setor in setores" :key="setor.id" :value="setor.id">
@@ -212,14 +223,6 @@
             </div>
             <!-- Seção de Afastamento -->
             <div class="form-group">
-              <label><i class="fas fa-calendar-times"></i> Data de Afastamento</label>
-              <input v-model="colaboradorEditando.data_afastamento" type="date" placeholder="Data do afastamento" />
-            </div>
-            <div class="form-group">
-              <label><i class="fas fa-calendar-check"></i> Data de Retorno</label>
-              <input v-model="colaboradorEditando.data_retorno" type="date" placeholder="Data de retorno" />
-            </div>
-            <div class="form-group">
               <label><i class="fas fa-clipboard-list"></i> Motivo do Afastamento</label>
               <select v-model="colaboradorEditando.motivo_afastamento">
                 <option value="">Selecione o motivo</option>
@@ -241,6 +244,25 @@
               <textarea v-model="colaboradorEditando.motivo_outros" 
                         placeholder="Descreva o motivo específico"
                         rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+              <label><i class="fas fa-calendar-times"></i> Data de Afastamento</label>
+              <input v-model="colaboradorEditando.data_afastamento" type="date" placeholder="Data do afastamento" />
+            </div>
+            <div class="form-group">
+              <label><i class="fas fa-calendar-check"></i> Data de Retorno</label>
+              <input v-model="colaboradorEditando.data_retorno" type="date" placeholder="Data de retorno" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-calendar-plus"></i> Data de Admissão</label>
+                <input v-model="colaboradorEditando.data_admissao" type="date" disabled placeholder="(não editável)" />
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-calendar-minus"></i> Data de Desligamento</label>
+                <input v-model="colaboradorEditando.data_inativado" type="date" disabled placeholder="(não editável)" />
+              </div>
             </div>
           </form>
         </div>
@@ -307,27 +329,44 @@ export default {
       ],
       opcoesValoresUnidade: [
         0, 0.5, 1
-      ]
+      ],
+      ordenacao: {
+        coluna: '',
+        asc: true
+      }
     }
   },
   mounted() {
+    this.ordenacao.coluna = 'nome'; // Ordena por nome ao abrir
+    this.ordenacao.asc = true;
     this.carregarColaboradores();
     this.carregarCargos();
     this.carregarSetores();
     this.carregarOpcoesCargoSeparadas();
   },
-
-  methods: {
-    async carregarSetores() {
-      // Exemplo de fetch, ajuste para sua API
-      const response = await fetch('/setores/');
-      const data = await response.json();
-      // Garante que setores seja array de objetos {setor_id, nome}
-      this.setores = Array.isArray(data)
-        ? data.map(s => typeof s === 'string' ? { setor_id: s, nome: s } : s)
-        : [];
-      console.log('Setores carregados:', this.setores);
-    },
+  computed: {
+    colaboradoresOrdenados() {
+      let lista = [...this.colaboradores];
+      if (this.ordenacao.coluna === 'nome') {
+        lista.sort((a, b) => {
+          const nomeA = (a.nome || '').toLowerCase();
+          const nomeB = (b.nome || '').toLowerCase();
+          if (nomeA < nomeB) return this.ordenacao.asc ? -1 : 1;
+          if (nomeA > nomeB) return this.ordenacao.asc ? 1 : -1;
+          return 0;
+        });
+      }
+      if (this.ordenacao.coluna === 'unidade') {
+        lista.sort((a, b) => {
+          const unidadeA = (a.setores?.[0]?.nome || '').toLowerCase();
+          const unidadeB = (b.setores?.[0]?.nome || '').toLowerCase();
+          if (unidadeA < unidadeB) return this.ordenacao.asc ? -1 : 1;
+          if (unidadeA > unidadeB) return this.ordenacao.asc ? 1 : -1;
+          return 0;
+        });
+      }
+      return lista;
+    }
   },
   methods: {
     async carregarColaboradores() {
@@ -467,9 +506,6 @@ export default {
         const payload = {
           nome: this.colaboradorEditando.nome.trim(),
           sobrenome: this.colaboradorEditando.sobrenome.trim(),
-          // Não enviar cargo_id quando usando campos separados
-          // cargo_id: this.colaboradorEditando.cargo_id || null,
-          // Campos separados do cargo
           cargo_nome: this.colaboradorEditando.cargo_nome || null,
           cargo_funcao: this.colaboradorEditando.cargo_funcao || null,
           cargo_equipe: this.colaboradorEditando.cargo_equipe || null,
@@ -581,6 +617,14 @@ export default {
       } catch (e) {
         console.error('Erro ao carregar opções de cargo:', e);
       }
+    },
+    ordenarPor(coluna) {
+      if (this.ordenacao.coluna === coluna) {
+        this.ordenacao.asc = !this.ordenacao.asc;
+      } else {
+        this.ordenacao.coluna = coluna;
+        this.ordenacao.asc = true;
+      }
     }
   }
 }
@@ -603,7 +647,7 @@ export default {
   align-items: center;
   margin-bottom: 24px;
   padding: 24px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: #fff; /* Removido gradiente */
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
   border: 1px solid #e2e8f0;
@@ -630,7 +674,7 @@ export default {
 }
 
 .stat-item {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: #2563eb; /* Azul sólido */
   color: white;
   padding: 12px 20px;
   border-radius: 12px;
@@ -668,7 +712,7 @@ export default {
 .error-container {
   text-align: center;
   padding: 48px;
-  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+  background: #fecaca; /* Sólido */
   border: 2px solid #f87171;
   border-radius: 16px;
   color: #dc2626;
@@ -681,7 +725,7 @@ export default {
 }
 
 .btn-retry {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  background: #dc2626; /* Sólido */
   color: white;
   border: none;
   padding: 12px 24px;
@@ -694,6 +738,7 @@ export default {
 }
 
 .btn-retry:hover {
+  background: #b91c1c; /* Sólido */
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
 }
@@ -712,7 +757,7 @@ export default {
 }
 
 .modern-table th {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  background: #1e293b; /* Sólido */
   color: white;
   padding: 20px 16px;
   text-align: left;
@@ -739,7 +784,7 @@ export default {
 }
 
 .data-row:hover {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: #e2e8f0; /* Sólido */
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
@@ -761,7 +806,7 @@ export default {
 .avatar {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: #2563eb; /* Sólido */
   color: white;
   border-radius: 50%;
   display: flex;
@@ -790,13 +835,13 @@ export default {
 }
 
 .tag-setor {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: #dbeafe; /* Sólido */
   color: #1e40af;
   border: 1px solid #93c5fd;
 }
 
 .tag-more {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  background: #e5e7eb; /* Sólido */
   color: #6b7280;
   border: 1px solid #d1d5db;
 }
@@ -812,13 +857,13 @@ export default {
 }
 
 .badge-cargo {
-  background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%);
+  background: #dbeafe; /* Sólido */
   color: #0369a1;
   border: 1px solid #7dd3fc;
 }
 
 .badge-equipe {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  background: #dcfce7; /* Sólido */
   color: #15803d;
   border: 1px solid #86efac;
 }
@@ -833,25 +878,25 @@ export default {
 }
 
 .level-1, .level-junior {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: #fde68a; /* Sólido */
   color: #92400e;
   border: 1px solid #f59e0b;
 }
 
 .level-2, .level-pleno {
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  background: #c7d2fe; /* Sólido */
   color: #4338ca;
   border: 1px solid #818cf8;
 }
 
 .level-3, .level-senior {
-  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  background: #fbcfe8; /* Sólido */
   color: #be185d;
   border: 1px solid #f472b6;
 }
 
 .level-none {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  background: #e5e7eb; /* Sólido */
   color: #6b7280;
   border: 1px solid #d1d5db;
 }
@@ -866,15 +911,21 @@ export default {
 }
 
 .status-active {
-  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  background: #bbf7d0; /* Sólido */
   color: #166534;
   border: 1px solid #4ade80;
 }
 
 .status-afastado {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: #fde68a; /* Sólido */
   color: #92400e;
   border: 1px solid #f59e0b;
+}
+
+.status-inativo {
+  background: #fca5a5; /* Sólido */
+  color: #991b1b;
+  border: 1px solid #f87171;
 }
 
 .meta-value {
@@ -890,7 +941,7 @@ export default {
 }
 
 .btn-action {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: #2563eb; /* Sólido */
   color: white;
   border: none;
   padding: 10px 20px;
@@ -910,7 +961,7 @@ export default {
 }
 
 .btn-action:hover {
-  background: linear-gradient(135deg, #2563eb, #1e40af);
+  background: #1e40af; /* Sólido */
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
 }
@@ -993,7 +1044,7 @@ export default {
   align-items: center;
   padding: 28px 36px;
   border-bottom: 2px solid #e2e8f0;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: #f8fafc; /* Sólido */
   border-radius: 20px 20px 0 0;
 }
 
@@ -1013,7 +1064,7 @@ export default {
 }
 
 .btn-close {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: #ef4444; /* Sólido */
   color: white;
   border: none;
   width: 36px;
@@ -1029,7 +1080,7 @@ export default {
 }
 
 .btn-close:hover {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: #b91c1c; /* Sólido */
   transform: scale(1.1) rotate(90deg);
 }
 
@@ -1160,7 +1211,7 @@ export default {
 }
 
 .select-wrapper.multi select option:checked {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: #2563eb; /* Sólido */
   color: white;
 }
 
@@ -1185,12 +1236,12 @@ export default {
   gap: 16px;
   padding: 28px 36px;
   border-top: 2px solid #e2e8f0;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: #f8fafc; /* Sólido */
   border-radius: 0 0 20px 20px;
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #64748b, #475569);
+  background: #64748b; /* Sólido */
   color: white;
   border: none;
   padding: 14px 28px;
@@ -1208,13 +1259,13 @@ export default {
 }
 
 .btn-secondary:hover {
-  background: linear-gradient(135deg, #475569, #334155);
+  background: #334155; /* Sólido */
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(100, 116, 139, 0.35);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #059669, #047857);
+  background: #059669; /* Sólido */
   color: white;
   border: none;
   padding: 14px 32px;
@@ -1234,13 +1285,13 @@ export default {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #047857, #065f46);
+  background: #065f46; /* Sólido */
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
 }
 
 .btn-primary:disabled {
-  background: linear-gradient(135deg, #d1d5db, #9ca3af);
+  background: #9ca3af; /* Sólido */
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -1263,7 +1314,7 @@ export default {
   height: 48px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
-  background: white;
+  background: #dbeafe; /* Sólido */
   font-size: 14px;
   font-weight: 500;
   color: #1e293b;
@@ -1283,34 +1334,7 @@ export default {
   margin: 2px 0;
   border-radius: 6px;
   font-weight: 500;
-}
-
-/* Estilização personalizada para o select de tipo de pagamento */
-.custom-select-tipo-pgto {
-  width: 100%;
-  padding: 16px 20px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #f0f9ff 0%, #dbeafe 100%);
-  color: #0369a1;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
-  appearance: none;
-  cursor: pointer;
-}
-.custom-select-tipo-pgto:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-  background: #fafbfc;
-}
-.custom-select-tipo-pgto option {
-  font-size: 15px;
-  font-weight: 600;
-  padding: 10px;
-  background: #f0f9ff;
+  background: #dbeafe;
   color: #0369a1;
 }
 </style>
