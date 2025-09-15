@@ -11,32 +11,52 @@ Antes de iniciar, certifique-se de ter instalado:
 - **Node.js 14+** e **npm**
 - **Git** (opcional, para controle de versão)
 
-## 🚀 Como executar o projeto
 
-### 1. Preparação inicial
+## 🚀 Como executar o projeto no Linux
 
-1. Abra o **PowerShell** como administrador
-2. Navegue até a pasta do projeto:
-   ```powershell
-   cd c:\Users\yuri.flores\Desktop\System_ti
-   ```
+### 1. Clonando o projeto
+
+```bash
+git clone https://github.com/yuripereirafl/System_ti-main.git
+cd System_ti-main
+```
 
 ### 2. Configuração do Backend (FastAPI)
 
-1. **Navegue para a pasta do backend:**
-   ```powershell
-   cd backend
-   ```
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt --break-system-packages
+nohup venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > backend.log 2>&1 &
+```
 
-2. **Instale as dependências Python** (se ainda não instalou):
-   ```powershell
-   pip install fastapi uvicorn sqlalchemy sqlite3
-   ```
+### 3. Configuração do Frontend (Vue.js)
 
-3. **Inicie o servidor backend:**
-   ```powershell
-   python -m uvicorn app.main:app --reload --host 192.168.1.151 --port 8000
-   ```
+```bash
+cd ../frontend
+echo "VUE_APP_API_URL=http://192.168.1.37:8000" > .env
+npm install
+nohup npm run serve > frontend.log 2>&1 &
+```
+
+### 4. Acessando o sistema
+
+Acesse pelo navegador:
+```
+http://192.168.1.37:8080
+```
+
+### 5. Logs e diagnóstico
+
+Para ver os logs do backend:
+```bash
+tail -n 50 ../backend/backend.log
+```
+Para ver os logs do frontend:
+```bash
+tail -n 50 frontend.log
+```
 
    > ⚠️ **Importante**: Use o IP da sua rede local. Para descobrir seu IP:
    > ```powershell
