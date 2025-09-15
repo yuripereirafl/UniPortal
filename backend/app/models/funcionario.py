@@ -28,6 +28,7 @@ funcionario_grupo_email = Table(
 
 
 from app.models.grupo_pasta import funcionario_grupo_pasta
+from app.models.funcionario_grupo_whatsapp import funcionario_grupo_whatsapp
 
 class Funcionario(Base):
     __tablename__ = 'funcionarios'
@@ -50,3 +51,4 @@ class Funcionario(Base):
     sistemas = relationship("Sistema", secondary=funcionario_sistema, backref="funcionarios")
     grupos_email = relationship("GrupoEmail", secondary=funcionario_grupo_email, backref="funcionarios")
     grupos_pasta = relationship("GrupoPasta", secondary=funcionario_grupo_pasta, back_populates="funcionarios")
+    grupos_whatsapp = relationship("GrupoWhatsapp", secondary=funcionario_grupo_whatsapp, back_populates="funcionarios")

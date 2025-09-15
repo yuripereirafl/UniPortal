@@ -17,7 +17,7 @@ engine = create_engine(
     pool_pre_ping=True,  
     pool_recycle=300,    
     echo=False,
-        connect_args={"options": "-csearch_path=rh_homologacao,public"}          
+    connect_args={"options": "-csearch_path=rh_homologacao,rh,public"}          
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -43,4 +43,3 @@ def test_connection():
 # Para debug (opcional)
 if __name__ == "__main__":
     test_connection()
-

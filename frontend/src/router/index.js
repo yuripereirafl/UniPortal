@@ -1,8 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../api';
-// Configura a baseURL do axios para o backend correto
 axios.defaults.baseURL = API_BASE_URL;
-// Interceptor para adicionar o token JWT em todas as requisições
 axios.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -11,13 +9,17 @@ axios.interceptors.request.use(config => {
   return config;
 });
 import { createRouter, createWebHistory } from 'vue-router';
-import Dashboard from '../views/Dashboard.vue';
-import CadastroUsuario from '../views/CadastroUsuario.vue';
-import Cadastro from '../views/Cadastro.vue';
-import Funcionarios from '../views/Funcionarios.vue';
-import Sistemas from '../views/Sistemas.vue';
-import GruposPasta from '../views/GruposPasta.vue';
-import Login from '../views/Login.vue';
+
+// Lazy loading para melhor performance
+const Dashboard = () => import('../views/Dashboard.vue');
+const CadastroUsuario = () => import('../views/CadastroUsuario.vue');
+const Cadastro = () => import('../views/Cadastro.vue');
+const Funcionarios = () => import('../views/Funcionarios.vue');
+const Sistemas = () => import('../views/Sistemas.vue');
+const GruposPasta = () => import('../views/GruposPasta.vue');
+const GruposEmail = () => import('../views/GruposEmail.vue');
+const Usuarios = () => import('../views/Usuarios.vue');
+const Login = () => import('../views/Login.vue');
 
 const Configuracoes = { template: '<div><h2 style="color:var(--cor-primaria);font-family:var(--font-titulo);">Configurações</h2><p>Configurações do sistema aparecerão aqui.</p></div>' };
 
@@ -29,9 +31,9 @@ const routes = [
   { path: '/sistemas', component: Sistemas },
   { path: '/funcionarios', component: Funcionarios },
   { path: '/grupos-pasta', component: GruposPasta },
-  { path: '/grupos-email', component: require('../views/GruposEmail.vue').default },
+  { path: '/grupos-email', component: GruposEmail },
   { path: '/configuracoes', component: Configuracoes },
-  { path: '/usuarios', component: require('../views/Usuarios.vue').default }
+  { path: '/usuarios', component: Usuarios }
 ];
 
 const router = createRouter({

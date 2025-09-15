@@ -1,29 +1,46 @@
 <template>
-  <div class="dashboard-colaboradores">
+  <!-- Visão de Meta da Unidade -->
+  <VisaoMetaUnidade 
+    v-if="mostrarMetaUnidade" 
+    @voltar="voltarParaQuadro"
+  />
+  
+  <!-- Visão de Meta -->
+  <VisaoMeta 
+    v-if="mostrarVisaoMeta" 
+    :colaborador="colaboradorSelecionadoMeta"
+    @voltar="voltarParaQuadro"
+  />
+  
+  <!-- Quadro de Colaboradores -->
+  <div v-else-if="!mostrarVisaoMeta && !mostrarMetaUnidade" class="dashboard-colaboradores">
     <div class="header-section">
-      <h2><i class="fas fa-users"></i> Quadro de Colaboradores</h2>
-      <div class="stats">
-        <span class="stat-item">
-          <i class="fas fa-chart-bar"></i> 
-          Total: {{ colaboradores.length }}
-        </span>
+      <div class="header-left">
+        <h2><i class="fas fa-users"></i> Quadro de Colaboradores</h2>
+      </div>
+      <div class="header-actions">
+        <button @click="abrirMetaUnidade" class="btn-meta-unidade">
+          <i class="fas fa-building"></i>
+          <span>Meta da Unidade</span>
+        </button>
+        <div class="total-display">
+          <i class="fas fa-users"></i>
+          <span>{{ colaboradoresLista.length }}</span>
+        </div>
       </div>
     </div>
     
-    <!-- Loading com animação -->
     <div v-if="carregando" class="loading-container">
       <div class="loading-spinner"></div>
       <p>Carregando colaboradores...</p>
     </div>
     
-    <!-- Erro estilizado -->
     <div v-else-if="erro" class="error-container">
       <i class="fas fa-exclamation-triangle"></i>
       <p>{{ erro }}</p>
       <button @click="carregarColaboradores" class="btn-retry">Tentar Novamente</button>
     </div>
     
-    <!-- Tabela moderna -->
     <div v-else class="table-container">
       <table class="modern-table">
         <thead>
@@ -106,10 +123,16 @@
             </td>
             <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
             <td>
-              <button @click="editarColaborador(colab)" class="btn-action">
-                <i class="fas fa-edit"></i>
-                <span>Editar</span>
-              </button>
+              <div class="action-buttons">
+                <button @click="editarColaborador(colab)" class="btn-action btn-edit">
+                  <i class="fas fa-edit"></i>
+                  <span>Editar</span>
+                </button>
+                <button @click="abrirVisaoMeta(colab)" class="btn-action btn-meta">
+                  <i class="fas fa-target"></i>
+                  <span>Meta</span>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -144,7 +167,6 @@
               <label><i class="fas fa-id-card"></i> CPF</label>
               <input v-model="colaboradorEditando.cpf" type="text" disabled placeholder="(não editável)" />
             </div>
-            <!-- Campos separados do cargo -->
             <div class="form-group">
               <label><i class="fas fa-briefcase"></i> Nome do Cargo</label>
               <div class="select-wrapper">
@@ -283,14 +305,33 @@
 </template>
 
 <script>
+import VisaoMeta from './VisaoMeta.vue'
+import VisaoMetaUnidade from './VisaoMetaUnidade.vue'
+import { API_BASE_URL } from '@/api.js'
+
 export default {
   name: 'QuadroColaboradores',
+  components: {
+    VisaoMeta,
+    VisaoMetaUnidade
+  },
+  props: {
+    colaboradores: {
+      type: Array,
+      default: () => []
+    }
+  },
   data() {
     return {
-      colaboradores: [],
+      colaboradoresData: [], // Lista interna quando não há props
       carregando: false,
       erro: null,
       showModal: false,
+      // Estados para a visão de meta
+      mostrarVisaoMeta: false,
+      colaboradorSelecionadoMeta: null,
+      // Estados para a visão de meta da unidade
+      mostrarMetaUnidade: false,
       colaboradorEditando: {
         id: null,
         nome: '',
@@ -339,14 +380,25 @@ export default {
   mounted() {
     this.ordenacao.coluna = 'nome'; // Ordena por nome ao abrir
     this.ordenacao.asc = true;
-    this.carregarColaboradores();
+    
+    // Só carrega dados se não foram passados via props
+    if (!this.colaboradores || this.colaboradores.length === 0) {
+      this.carregarColaboradores();
+    }
+    
     this.carregarCargos();
     this.carregarSetores();
     this.carregarOpcoesCargoSeparadas();
   },
   computed: {
+    // Usa colaboradores da prop se disponível, senão usa dados internos
+    colaboradoresLista() {
+      return this.colaboradores && this.colaboradores.length > 0 
+        ? this.colaboradores 
+        : this.colaboradoresData;
+    },
     colaboradoresOrdenados() {
-      let lista = [...this.colaboradores];
+      let lista = [...this.colaboradoresLista];
       if (this.ordenacao.coluna === 'nome') {
         lista.sort((a, b) => {
           const nomeA = (a.nome || '').toLowerCase();
@@ -374,7 +426,7 @@ export default {
       this.erro = null;
       try {
         console.log('Buscando dados do backend...');
-    const response = await fetch('/quadro_colaboradores/');
+        const response = await fetch(`${API_BASE_URL}/quadro_colaboradores/`);
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -382,7 +434,7 @@ export default {
         
         const data = await response.json();
         console.log('Dados recebidos:', data);
-        this.colaboradores = data;
+        this.colaboradoresData = data;
         
         if (data.length === 0) {
           console.log('Nenhum colaborador encontrado');
@@ -390,7 +442,7 @@ export default {
       } catch (e) {
         console.error('Erro ao carregar colaboradores:', e);
         this.erro = 'Erro ao carregar colaboradores: ' + e.message;
-        this.colaboradores = [];
+        this.colaboradoresData = [];
       }
       this.carregando = false;
     },
@@ -471,6 +523,25 @@ export default {
       };
     },
     
+    // Métodos para a visão de meta
+    abrirVisaoMeta(colaborador) {
+      console.log('Abrindo visão de meta para:', colaborador);
+      this.colaboradorSelecionadoMeta = colaborador;
+      this.mostrarVisaoMeta = true;
+    },
+    
+    voltarParaQuadro() {
+      this.mostrarVisaoMeta = false;
+      this.mostrarMetaUnidade = false;
+      this.colaboradorSelecionadoMeta = null;
+    },
+    
+    // Métodos para a visão de meta da unidade
+    abrirMetaUnidade() {
+      console.log('Abrindo visão de meta da unidade');
+      this.mostrarMetaUnidade = true;
+    },
+    
     async salvarEdicao() {
       this.salvando = true;
       try {
@@ -541,7 +612,7 @@ export default {
         console.log('setores_ids:', payload.setores_ids);
         console.log('=====================');
         
-        const response = await fetch(`/funcionarios/${this.colaboradorEditando.id}`, {
+        const response = await fetch(`${API_BASE_URL}/funcionarios/${this.colaboradorEditando.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -579,7 +650,7 @@ export default {
     // Métodos para carregar listas de opções
     async carregarCargos() {
       try {
-    const response = await fetch('/cargos/');
+    const response = await fetch(`${API_BASE_URL}/cargos/`);
         this.cargos = await response.json();
       } catch (e) {
         console.error('Erro ao carregar cargos:', e);
@@ -588,7 +659,7 @@ export default {
     
     async carregarSetores() {
       try {
-    const response = await fetch('/setores/');
+    const response = await fetch(`${API_BASE_URL}/setores/`);
         this.setores = await response.json();
       } catch (e) {
         console.error('Erro ao carregar setores:', e);
@@ -599,10 +670,10 @@ export default {
       try {
         // Carrega opções distintas de cada campo
         const [nomes, funcoes, equipes, niveis] = await Promise.all([
-          fetch('/cargos/nomes').then(r => r.json()),
-          fetch('/cargos/funcoes').then(r => r.json()),
-          fetch('/cargos/equipes').then(r => r.json()),
-          fetch('/cargos/niveis').then(r => r.json())
+          fetch(`${API_BASE_URL}/cargos/nomes`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/cargos/funcoes`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/cargos/equipes`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/cargos/niveis`).then(r => r.json())
         ]);
         
         // Popula o objeto opcoesCargoSeparadas
@@ -647,10 +718,67 @@ export default {
   align-items: center;
   margin-bottom: 24px;
   padding: 24px;
-  background: #fff; /* Removido gradiente */
+  background: #fff;
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
   border: 1px solid #e2e8f0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.btn-meta-unidade {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  position: relative;
+}
+
+.btn-meta-unidade:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+.btn-meta-unidade i {
+  font-size: 1rem;
+}
+
+.total-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: #475569;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.total-display i {
+  color: #667eea;
+  font-size: 1rem;
 }
 
 .header-section h2 {
@@ -964,6 +1092,31 @@ export default {
   background: #1e40af; /* Sólido */
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+}
+
+/* Estilos para os botões de ação */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-edit {
+  background: #2563eb !important;
+}
+
+.btn-edit:hover {
+  background: #1e40af !important;
+}
+
+.btn-meta {
+  background: #059669 !important;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25) !important;
+}
+
+.btn-meta:hover {
+  background: #047857 !important;
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35) !important;
 }
 
 .empty-row td {
@@ -1336,5 +1489,54 @@ export default {
   font-weight: 500;
   background: #dbeafe;
   color: #0369a1;
+}
+
+/* Responsividade para o header */
+@media (max-width: 768px) {
+  .header-section {
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+  }
+  
+  .header-left {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+    width: 100%;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .btn-meta-unidade {
+    width: 100%;
+    max-width: 250px;
+    justify-content: center;
+  }
+  
+  .total-display {
+    align-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-section h2 {
+    font-size: 24px;
+  }
+  
+  .btn-meta-unidade {
+    padding: 14px 20px;
+    font-size: 0.95rem;
+  }
+  
+  .total-display {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
 }
 </style>

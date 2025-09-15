@@ -24,28 +24,54 @@ export default {
   data() {
     return {
       cargos: [],
-      selectedCargo: this.modelValue
+      selectedCargo: this.modelValue,
+      isLoading: false,
+      _cacheExpiry: null,
+      _cacheTimeout: 5 * 60 * 1000 // 5 minutos
     };
   },
+  
   watch: {
     modelValue(val) {
       this.selectedCargo = val;
     }
   },
+  
   computed: {
     cargosOrdenados() {
+      if (!this.cargos.length) return [];
       return [...this.cargos].sort((a, b) => a.nome.localeCompare(b.nome));
     }
   },
+  
   methods: {
     updateCargo() {
       this.$emit('update:modelValue', this.selectedCargo);
+    },
+    
+    async carregarCargos() {
+      // Verificar cache
+      if (this.cargos.length && this._cacheExpiry && Date.now() < this._cacheExpiry) {
+        return;
+      }
+      
+      if (this.isLoading) return;
+      
+      this.isLoading = true;
+      try {
+        const res = await axios.get(`${API_BASE_URL}/cargos/`);
+        this.cargos = res.data;
+        this._cacheExpiry = Date.now() + this._cacheTimeout;
+      } catch (error) {
+        console.error('Erro ao carregar cargos:', error);
+      } finally {
+        this.isLoading = false;
+      }
     }
   },
+  
   mounted() {
-    axios.get(`${API_BASE_URL}/cargos/`).then(res => {
-      this.cargos = res.data;
-    });
+    this.carregarCargos();
   }
 };
 </script>

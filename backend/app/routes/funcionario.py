@@ -8,11 +8,13 @@ from ..models.sistema import Sistema as SistemaModel
 from ..models.grupo_email import GrupoEmail
 from ..models.cargo import Cargo
 from ..models.grupo_pasta import GrupoPasta
+from ..models.grupo_whatsapp import GrupoWhatsapp
 from ..schemas.funcionario import FuncionarioCreate, Funcionario as FuncionarioSchema, FuncionarioUpdate
 from ..schemas.sistema import Sistema as SistemaSchema
 from ..schemas.setor import SetorOut
 from ..schemas.grupo_email import GrupoEmailOut
 from ..schemas.grupo_pasta import GrupoPastaOut
+from ..schemas.grupo_whatsapp import GrupoWhatsapp as GrupoWhatsappOut
 from ..database import engine
 from app.models.meta import Meta
 from app.models.funcionario_meta import FuncionarioMeta
@@ -88,6 +90,12 @@ def adicionar_funcionario(funcionario: FuncionarioCreate):
         novo_funcionario.grupos_pasta = grupos_pasta
     else:
         novo_funcionario.grupos_pasta = []
+    # Vincula grupos de WhatsApp
+    if hasattr(funcionario, 'grupos_whatsapp_ids') and funcionario.grupos_whatsapp_ids:
+        grupos_whatsapp = db.query(GrupoWhatsapp).filter(GrupoWhatsapp.id.in_(funcionario.grupos_whatsapp_ids)).all()
+        novo_funcionario.grupos_whatsapp = grupos_whatsapp
+    else:
+        novo_funcionario.grupos_whatsapp = []
     db.commit()
     db.refresh(novo_funcionario)
     # Remove _sa_instance_state do dict antes de passar para o Pydantic
@@ -235,6 +243,13 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
             db_funcionario.grupos_pasta = grupos_pasta
         else:
             db_funcionario.grupos_pasta = []
+
+    if hasattr(funcionario, 'grupos_whatsapp_ids') and funcionario.grupos_whatsapp_ids is not None:
+        if funcionario.grupos_whatsapp_ids:
+            grupos_whatsapp = db.query(GrupoWhatsapp).filter(GrupoWhatsapp.id.in_(funcionario.grupos_whatsapp_ids)).all()
+            db_funcionario.grupos_whatsapp = grupos_whatsapp
+        else:
+            db_funcionario.grupos_whatsapp = []
     
     if funcionario.setores_ids is not None:
         if funcionario.setores_ids:
@@ -325,6 +340,7 @@ def list_funcionarios():
         joinedload(FuncionarioModel.sistemas),
         joinedload(FuncionarioModel.grupos_email),
         joinedload(FuncionarioModel.grupos_pasta),
+        joinedload(FuncionarioModel.grupos_whatsapp),
         joinedload(FuncionarioModel.cargos_vinculos).joinedload(FuncionarioCargo.cargo)
     ).all()
     resultado = []
@@ -333,6 +349,7 @@ def list_funcionarios():
         sistemas = [SistemaSchema.from_orm(sistema) for sistema in funcionario.sistemas]
         grupos_email = [GrupoEmailOut.from_orm(grupo) for grupo in funcionario.grupos_email]
         grupos_pasta = [GrupoPastaOut.from_orm(grupo) for grupo in funcionario.grupos_pasta]
+        grupos_whatsapp = [GrupoWhatsappOut.from_orm(grupo) for grupo in funcionario.grupos_whatsapp]
         cargo_nome = None
         if hasattr(funcionario, 'cargos_vinculos') and funcionario.cargos_vinculos:
             vinculos_ativos = [v for v in funcionario.cargos_vinculos if v.dt_fim is None]
@@ -347,6 +364,7 @@ def list_funcionarios():
             'sistemas': sistemas,
             'grupos_email': grupos_email,
             'grupos_pasta': grupos_pasta,
+            'grupos_whatsapp': grupos_whatsapp,
             'cargo': cargo_nome,
             'data_admissao': str(funcionario.data_admissao) if funcionario.data_admissao not in (None, '') else '',
             'data_inativado': str(funcionario.data_inativado) if funcionario.data_inativado is not None else '',
