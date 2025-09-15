@@ -198,9 +198,17 @@ export default {
   methods: {
     async carregarFuncionarios() {
       try {
+        console.log('Carregando funcionários de:', `${API_BASE_URL}/funcionarios/`);
         const response = await fetch(`${API_BASE_URL}/funcionarios/`);
-        this.funcionarios = await response.json();
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Funcionários carregados:', data);
+        this.funcionarios = data;
       } catch (e) {
+        console.error('Erro ao carregar funcionários:', e);
         this.funcionarios = [];
       }
     },
