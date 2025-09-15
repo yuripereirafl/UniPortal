@@ -156,6 +156,7 @@ import GruposPasta from './GruposPasta.vue';
 import Cargos from './Cargos.vue';
 import QuadroColaboradores from '../components/QuadroColaboradores.vue';
 import MetaColaborador from '../components/MetaColaborador.vue';
+import { API_BASE_URL } from '@/api.js';
 
 export default {
   name: 'Dashboard',
@@ -197,7 +198,7 @@ export default {
   methods: {
     async carregarFuncionarios() {
       try {
-        const response = await fetch('http://localhost:8000/funcionarios/');
+        const response = await fetch(`${API_BASE_URL}/funcionarios/`);
         this.funcionarios = await response.json();
       } catch (e) {
         this.funcionarios = [];
