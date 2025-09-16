@@ -1,22 +1,25 @@
+// Usar variável de ambiente ou fallback para desenvolvimento
+const API_TARGET = process.env.VUE_APP_API_URL || 'http://localhost:8000';
+
 module.exports = {
   devServer: {
     host: '0.0.0.0',
     port: 8080,
     proxy: {
       '^/quadro_colaboradores': {
-        target: 'http://192.168.1.37:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '^/funcionarios': {
-        target: 'http://192.168.1.37:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '^/cargos': {
-        target: 'http://192.168.1.37:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '^/setores': {
-        target: 'http://192.168.1.37:8000',
+        target: API_TARGET,
         changeOrigin: true,
       }
     }

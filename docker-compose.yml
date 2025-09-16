@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-yourpassword}
+      - DB_NAME=${DB_NAME:-intelix_rh}
+    depends_on:
+      - db
+    networks:
+      - system-ti-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    environment:
+      - VUE_APP_API_URL=http://${DB_HOST:-localhost}:${BACKEND_PORT:-8000}
+    depends_on:
+      - backend
+    networks:
+      - system-ti-network
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=${DB_NAME:-intelix_rh}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-yourpassword}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - system-ti-network
+
+volumes:
+  postgres_data:
+
+networks:
+  system-ti-network:
+    driver: bridge

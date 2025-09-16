@@ -3,14 +3,13 @@
 // Para produção: altere para sua URL real
 
 export const API_CONFIG = {
-  // Desenvolvimento com IP da máquina (permite acesso na rede)
-  BASE_URL: process.env.VUE_APP_API_URL || 'http://192.168.1.37:8000',
+  // Usar variável de ambiente - flexível para qualquer ambiente
+  BASE_URL: process.env.VUE_APP_API_URL || 'http://localhost:8000',
   
-  // Localhost (apenas para desenvolvimento local)
-  // BASE_URL: 'http://localhost:8000',
-  
-  // Produção (descomente a linha abaixo e coloque sua URL real)
-  // BASE_URL: 'https://sua-api-producao.com',
+  // Exemplos de configuração:
+  // Desenvolvimento local: http://localhost:8000
+  // Servidor específico: http://192.168.1.37:8000
+  // Produção: https://sua-api-producao.com
   
   // Endpoints
   ENDPOINTS: {
