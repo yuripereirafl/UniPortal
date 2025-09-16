@@ -14,9 +14,9 @@ from app.models.usuario import Usuario
 # Usar variáveis de ambiente ou fallback para desenvolvimento
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
-DB_USER = os.getenv("DB_USER", "dadosrh")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "dadosrh")
-DB_NAME = os.getenv("DB_NAME", "dadosrh")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
+DB_NAME = os.getenv("DB_NAME", "postgres")
 
 SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
