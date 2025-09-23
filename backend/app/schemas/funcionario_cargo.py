@@ -19,4 +19,4 @@ class FuncionarioCargoRead(FuncionarioCargoBase):
     pass
 
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -1,20 +1,29 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker, selectinload
 from app.database import engine, SessionLocal, get_db
 from ..models.usuario import Usuario as UsuarioModel
 
 router = APIRouter()
-# Endpoint para listar todos os usuários
+# Endpoint para listar todos os usuários (com setores carregados)
 @router.get('/usuarios/')
 def listar_usuarios(db: Session = Depends(get_db)):
-    usuarios = db.query(UsuarioModel).all()
+    usuarios = db.query(UsuarioModel).options(selectinload(UsuarioModel.setores)).all()
+    print("[DEBUG] Usuários carregados:")
+    for u in usuarios:
+        print(f"Usuário: {u.id} - {u.username} | Setores: {[{'id': s.id, 'nome': s.nome} for s in u.setores]}")
     return [
-        {"id": u.id, "username": u.username} for u in usuarios
+        {
+            "id": u.id,
+            "username": u.username,
+            "setores": [{"id": s.id, "nome": s.nome, "descricao": s.descricao} for s in u.setores]
+        }
+        for u in usuarios
     ]
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -22,7 +31,7 @@ SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 class Token(BaseModel):
@@ -100,6 +109,7 @@ def criar_usuario(usuario: UsuarioCreate):
 class UsuarioUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
+    setores_ids: list[int] | None = None
 
 @router.put('/usuarios/{id}')
 def editar_usuario(id: int, usuario_update: UsuarioUpdate):
@@ -112,9 +122,20 @@ def editar_usuario(id: int, usuario_update: UsuarioUpdate):
         usuario.username = usuario_update.username
     if usuario_update.password:
         usuario.hashed_password = get_password_hash(usuario_update.password)
+    if usuario_update.setores_ids is not None:
+        # Atualiza setores do usuário
+        from ..models.setor import Setor
+        setores = db.query(Setor).filter(Setor.id.in_(usuario_update.setores_ids)).all()
+        usuario.setores = setores
+        # Atualiza setores do funcionário vinculado
+        if usuario.id_funcionario:
+            from ..models.funcionario import Funcionario
+            funcionario = db.query(Funcionario).filter(Funcionario.id == usuario.id_funcionario).first()
+            if funcionario:
+                funcionario.setores = setores
     db.commit()
     db.close()
-    return {"msg": "Usuário atualizado"}
+    return {"msg": "Usuário e funcionário atualizados"}
 
 # Endpoint para excluir usuário
 @router.delete('/usuarios/{id}')

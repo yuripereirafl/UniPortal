@@ -143,7 +143,6 @@
                 required 
               />
             </div>
-            
             <div class="form-group">
               <label>
                 <i class="fas fa-lock"></i>
@@ -159,7 +158,25 @@
               <small v-if="usuarioEditando" class="form-hint">
                 Deixe em branco para manter a senha atual
               </small>
+              <label>
+                <i class="fas fa-building"></i>
+                Setores de acesso
+              </label>
+              <div class="multi-select-container">
+                <div class="selected-items" style="margin-bottom: 8px;">
+                  <span v-for="id in form.setores_ids" :key="id" class="selected-chip" @click="removerSetorUsuario(id)" style="background:#e3e7fa;color:#3a3a3a;margin-right:4px;cursor:pointer;display:inline-block;padding:2px 10px;border-radius:12px;font-size:13px;">
+                    {{ getSetorNomeUsuario(id) }} <span class="chip-close" style="margin-left:4px;font-weight:bold;">&times;</span>
+                  </span>
+                </div>
+                <select v-model="novoSetorIdUsuario" @change="adicionarSetorUsuario" class="form-input">
+                  <option value="">+ Adicionar setor...</option>
+                  <option v-for="setor in setores" :key="setor.id" :value="setor.id">
+                    {{ setor.nome }}
+                  </option>
+                </select>
+              </div>
             </div>
+            <small v-if="form.setores_ids.length === 0" class="form-hint">Selecione pelo menos um setor para acesso</small>
           </form>
         </div>
         
@@ -193,9 +210,12 @@ export default {
       salvando: false,
       form: {
         username: '',
-        password: ''
+        password: '',
+        setores_ids: []
       },
-      filtro: ''
+      setores: [],
+      filtro: '',
+      novoSetorIdUsuario: ''
     };
   },
   computed: {
@@ -207,6 +227,15 @@ export default {
     }
   },
   methods: {
+    async carregarSetores() {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/setores/`);
+        this.setores = res.data;
+      } catch (error) {
+        console.error('Erro ao carregar setores:', error);
+        this.setores = [];
+      }
+    },
     async carregarUsuarios() {
       try {
         const res = await axios.get(`${API_BASE_URL}/usuarios/`);
@@ -220,7 +249,22 @@ export default {
     abrirFormulario() {
       this.mostrarFormulario = true;
       this.usuarioEditando = null;
-      this.form = { username: '', password: '' };
+      this.form = { username: '', password: '', setores_ids: [] };
+      this.novoSetorIdUsuario = '';
+    },
+    getSetorNomeUsuario(id) {
+      const setor = this.setores.find(s => String(s.id) === String(id));
+      return setor ? setor.nome : 'Setor não encontrado';
+    },
+    adicionarSetorUsuario() {
+      const id = parseInt(this.novoSetorIdUsuario);
+      if (id && !this.form.setores_ids.includes(id)) {
+        this.form.setores_ids.push(id);
+      }
+      this.novoSetorIdUsuario = '';
+    },
+    removerSetorUsuario(id) {
+      this.form.setores_ids = this.form.setores_ids.filter(sId => String(sId) !== String(id));
     },
     
     fecharFormulario() {
@@ -246,12 +290,21 @@ export default {
       this.salvando = false;
     },
     
-    editarUsuario(usuario) {
+    async editarUsuario(usuario) {
+      // Garante que setores estejam carregados antes de abrir o formulário
+      if (!this.setores || this.setores.length === 0) {
+        await this.carregarSetores();
+      }
+      console.log('Usuário selecionado para edição:', usuario);
       this.usuarioEditando = usuario;
       this.form = { 
         username: usuario.username, 
-        password: '' 
+        password: '',
+        setores_ids: Array.isArray(usuario.setores)
+          ? usuario.setores.map(s => s.id)
+          : []
       };
+      console.log('Setores vinculados:', this.form.setores_ids);
       this.mostrarFormulario = true;
     },
     
@@ -269,7 +322,8 @@ export default {
   },
   
   mounted() {
-    this.carregarUsuarios();
+  this.carregarUsuarios();
+  this.carregarSetores();
   }
 };
 </script>

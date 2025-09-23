@@ -7,6 +7,9 @@ from ..models.setor import Setor
 from ..models.sistema import Sistema as SistemaModel
 from ..models.grupo_email import GrupoEmail
 from ..models.cargo import Cargo
+from ..models.usuario import Usuario as UsuarioModel
+from passlib.context import CryptContext
+import re
 from ..models.grupo_pasta import GrupoPasta
 from ..models.grupo_whatsapp import GrupoWhatsapp
 from ..schemas.funcionario import FuncionarioCreate, Funcionario as FuncionarioSchema, FuncionarioUpdate
@@ -34,6 +37,11 @@ def converter_string_para_date(data_str):
 router = APIRouter()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def _hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
 @router.post('/funcionarios/', response_model=FuncionarioSchema)
 def adicionar_funcionario(funcionario: FuncionarioCreate):
     db = SessionLocal()
@@ -51,6 +59,37 @@ def adicionar_funcionario(funcionario: FuncionarioCreate):
     db.add(novo_funcionario)
     db.commit()
     db.refresh(novo_funcionario)
+    # Criar ou atualizar usuário baseado no CPF (login = cpf somente dígitos, senha = últimos 4 dígitos)
+    try:
+        if novo_funcionario.cpf:
+            cpf_digits = re.sub(r"\D", "", novo_funcionario.cpf)
+            if cpf_digits:
+                username = cpf_digits
+                senha_raw = cpf_digits[-4:] if len(cpf_digits) >= 4 else cpf_digits
+                hashed = _hash_password(senha_raw)
+                existing_user = db.query(UsuarioModel).filter(UsuarioModel.username == username).first()
+                if existing_user:
+                    # atualiza senha, vincula ao funcionário e sincroniza setores
+                    existing_user.hashed_password = hashed
+                    existing_user.id_funcionario = novo_funcionario.id
+                    try:
+                        existing_user.setores = novo_funcionario.setores if hasattr(novo_funcionario, 'setores') else []
+                    except Exception:
+                        # se houver problema ao atualizar setores do usuário, apenas ignorar
+                        pass
+                else:
+                    novo_usuario = UsuarioModel(username=username, hashed_password=hashed, id_funcionario=novo_funcionario.id)
+                    # atribui setores ao novo usuário (se houver)
+                    try:
+                        if hasattr(novo_funcionario, 'setores') and novo_funcionario.setores:
+                            novo_usuario.setores = novo_funcionario.setores
+                    except Exception:
+                        pass
+                    db.add(novo_usuario)
+                db.commit()
+    except Exception:
+        # Não falhar a criação do funcionário caso haja problema com usuário; apenas logar e continuar
+        db.rollback()
     # Vínculo de cargo via FuncionarioCargo
     if funcionario.cargo_id:
         cargo_obj = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
@@ -101,14 +140,29 @@ def adicionar_funcionario(funcionario: FuncionarioCreate):
     # Remove _sa_instance_state do dict antes de passar para o Pydantic
     funcionario_dict = dict(novo_funcionario.__dict__)
     funcionario_dict.pop('_sa_instance_state', None)
+
+    # Preferir setores do usuário (se o usuário foi criado/atualizado e possui setores)
+    usuario_setores_serialized = []
+    try:
+        if novo_funcionario.cpf:
+            cpf_digits = re.sub(r"\D", "", novo_funcionario.cpf)
+            if cpf_digits:
+                user_obj = db.query(UsuarioModel).filter(UsuarioModel.username == cpf_digits).first()
+                if user_obj and hasattr(user_obj, 'setores') and user_obj.setores:
+                    usuario_setores_serialized = [SetorOut.from_orm(s) for s in user_obj.setores]
+    except Exception:
+        usuario_setores_serialized = []
+
+    setores_para_resposta = usuario_setores_serialized if usuario_setores_serialized else [SetorOut.from_orm(setor) for setor in novo_funcionario.setores]
+
     funcionario_schema = FuncionarioSchema.model_validate({
     **funcionario_dict,
-        'setores': [SetorOut.from_orm(setor) for setor in novo_funcionario.setores],
+        'setores': setores_para_resposta,
         'sistemas': [SistemaSchema.from_orm(sistema) for sistema in novo_funcionario.sistemas],
         'grupos_email': [GrupoEmailOut.from_orm(grupo) for grupo in novo_funcionario.grupos_email],
         'grupos_pasta': [GrupoPastaOut.from_orm(grupo) for grupo in novo_funcionario.grupos_pasta],
         'cargo': None if not hasattr(novo_funcionario, 'cargos_vinculos') or not novo_funcionario.cargos_vinculos else (
-            novo_funcionario.cargos_vinculos[0].cargo.nome if novo_funcionario.cargos_vinculos[0].cargo else None
+            __import__('app.schemas.cargo', fromlist=['CargoOut']).CargoOut.from_orm(novo_funcionario.cargos_vinculos[0].cargo) if novo_funcionario.cargos_vinculos[0].cargo else None
         ),
         'data_admissao': str(novo_funcionario.data_admissao) if novo_funcionario.data_admissao not in (None, '') else '',
         'data_inativado': str(novo_funcionario.data_inativado) if novo_funcionario.data_inativado is not None else '',
@@ -257,6 +311,13 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
             db_funcionario.setores = setores
         else:
             db_funcionario.setores = []
+        # sincroniza setores no usuário vinculado (se existir)
+        try:
+            usuario_vinculado = db.query(UsuarioModel).filter(UsuarioModel.id_funcionario == db_funcionario.id).first()
+            if usuario_vinculado is not None:
+                usuario_vinculado.setores = db_funcionario.setores
+        except Exception:
+            pass
     
     if funcionario.sistemas_ids is not None:
         if funcionario.sistemas_ids:
@@ -306,21 +367,18 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
             raise HTTPException(status_code=500, detail=f"Erro ao processar meta: {str(e)}")
     db.commit()
     db.refresh(db_funcionario)
-    cargo_nome = None
+    cargo_obj = None
     if hasattr(db_funcionario, 'cargos_vinculos') and db_funcionario.cargos_vinculos:
         vinculos_ativos = [v for v in db_funcionario.cargos_vinculos if v.dt_fim is None]
-        if vinculos_ativos:
-            cargo_nome = vinculos_ativos[0].cargo.nome
-        else:
-            vinculo_recente = max(db_funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
-            cargo_nome = vinculo_recente.cargo.nome
+        chosen = vinculos_ativos[0] if vinculos_ativos else max(db_funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
+        cargo_obj = chosen.cargo if chosen and chosen.cargo else None
     funcionario_schema = FuncionarioSchema.model_validate({
         **db_funcionario.__dict__,
         'setores': [SetorOut.from_orm(setor) for setor in db_funcionario.setores],
         'sistemas': [SistemaSchema.from_orm(sistema) for sistema in db_funcionario.sistemas],
         'grupos_email': [GrupoEmailOut.from_orm(grupo) for grupo in db_funcionario.grupos_email],
         'grupos_pasta': [GrupoPastaOut.from_orm(grupo) for grupo in db_funcionario.grupos_pasta],
-        'cargo': cargo_nome,
+    'cargo': __import__('app.schemas.cargo', fromlist=['CargoOut']).CargoOut.from_orm(cargo_obj) if cargo_obj else None,
         'data_admissao': str(db_funcionario.data_admissao) if db_funcionario.data_admissao else '',
         'data_inativado': str(db_funcionario.data_inativado) if db_funcionario.data_inativado is not None else '',
         'cpf': db_funcionario.cpf,
@@ -350,14 +408,11 @@ def list_funcionarios():
         grupos_email = [GrupoEmailOut.from_orm(grupo) for grupo in funcionario.grupos_email]
         grupos_pasta = [GrupoPastaOut.from_orm(grupo) for grupo in funcionario.grupos_pasta]
         grupos_whatsapp = [GrupoWhatsappOut.from_orm(grupo) for grupo in funcionario.grupos_whatsapp]
-        cargo_nome = None
+        cargo_obj = None
         if hasattr(funcionario, 'cargos_vinculos') and funcionario.cargos_vinculos:
             vinculos_ativos = [v for v in funcionario.cargos_vinculos if v.dt_fim is None]
-            if vinculos_ativos:
-                cargo_nome = vinculos_ativos[0].cargo.nome
-            else:
-                vinculo_recente = max(funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
-                cargo_nome = vinculo_recente.cargo.nome
+            chosen = vinculos_ativos[0] if vinculos_ativos else max(funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
+            cargo_obj = chosen.cargo if chosen and chosen.cargo else None
         funcionario_schema = FuncionarioSchema.model_validate({
             **funcionario.__dict__,
             'setores': setores,
@@ -365,7 +420,7 @@ def list_funcionarios():
             'grupos_email': grupos_email,
             'grupos_pasta': grupos_pasta,
             'grupos_whatsapp': grupos_whatsapp,
-            'cargo': cargo_nome,
+            'cargo': __import__('app.schemas.cargo', fromlist=['CargoOut']).CargoOut.from_orm(cargo_obj) if cargo_obj else None,
             'data_admissao': str(funcionario.data_admissao) if funcionario.data_admissao not in (None, '') else '',
             'data_inativado': str(funcionario.data_inativado) if funcionario.data_inativado is not None else '',
             'cpf': funcionario.cpf,

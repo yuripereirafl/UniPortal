@@ -1,152 +1,113 @@
 <template>
-  <!-- Visão de Meta da Unidade -->
-  <VisaoMetaUnidade 
-    v-if="mostrarMetaUnidade" 
-    @voltar="voltarParaQuadro"
-  />
-  
-  <!-- Visão de Meta -->
-  <VisaoMeta 
-    v-if="mostrarVisaoMeta" 
-    :colaborador="colaboradorSelecionadoMeta"
-    @voltar="voltarParaQuadro"
-  />
-  
-  <!-- Quadro de Colaboradores -->
-  <div v-else-if="!mostrarVisaoMeta && !mostrarMetaUnidade" class="dashboard-colaboradores">
-    <div class="header-section">
-      <div class="header-left">
-        <h2><i class="fas fa-users"></i> Quadro de Colaboradores</h2>
-      </div>
-      <div class="header-actions">
-        <button @click="abrirMetaUnidade" class="btn-meta-unidade">
-          <i class="fas fa-building"></i>
-          <span>Meta da Unidade</span>
-        </button>
-        <div class="total-display">
-          <i class="fas fa-users"></i>
-          <span>{{ colaboradoresLista.length }}</span>
-        </div>
-      </div>
+  <VisaoMetaUnidade v-if="mostrarMetaUnidade" @voltar="mostrarMetaUnidade = false" />
+  <div class="dashboard-colaboradores">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <h2 style="margin: 0;">Quadro de Colaboradores</h2>
+      <button @click="mostrarMetaUnidade = true" class="btn-action btn-meta-unidade">
+        <i class="fas fa-bullseye"></i> Meta Unidade
+      </button>
     </div>
-    
-    <div v-if="carregando" class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>Carregando colaboradores...</p>
+    <div v-if="carregando" class="loading-indicator">
+      <div class="spinner"></div>
+      <span>Carregando colaboradores...</span>
     </div>
-    
-    <div v-else-if="erro" class="error-container">
-      <i class="fas fa-exclamation-triangle"></i>
-      <p>{{ erro }}</p>
-      <button @click="carregarColaboradores" class="btn-retry">Tentar Novamente</button>
-    </div>
-    
-    <div v-else class="table-container">
-      <table class="modern-table">
-        <thead>
-          <tr>
-            <th @click="ordenarPor('nome')" style="cursor:pointer">
-              Nome <i class="fas fa-sort"></i>
-            </th>
-            <th>Sobrenome</th>
-            <th @click="ordenarPor('unidade')" style="cursor:pointer">
-              Unidade <i class="fas fa-sort"></i>
-            </th>
-            <th>Cargo</th>
-            <th>Função</th>
-            <th>Equipe</th>
-            <th>Nível</th>
-            <th>Status</th>
-            <th>Meta</th>
-            <th>Tipo Pgto</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="colaboradoresOrdenados.length === 0" class="empty-row">
-            <td colspan="11">
-              <div class="empty-state">
-                <i class="fas fa-inbox empty-icon"></i>
-                <p>Nenhum colaborador encontrado</p>
-                <small>Verifique os dados ou tente recarregar</small>
-              </div>
-            </td>
-          </tr>
-          <tr v-for="(colab, index) in colaboradoresOrdenados" :key="colab.id" class="data-row" :class="{ 'row-even': index % 2 === 0 }">
-            <td class="name-cell">
-              <div class="user-info">
-                <div class="avatar">{{ (colab.nome || 'U').charAt(0).toUpperCase() }}</div>
-                <span>{{ colab.nome || '-' }}</span>
-              </div>
-            </td>
-            <td>{{ colab.sobrenome || '-' }}</td>
-            <td>
-              <div class="tag-container">
-                <span v-if="colab.setores && colab.setores.length" 
-                      v-for="setor in colab.setores.slice(0, 2)" 
-                      :key="setor.id" 
-                      class="tag tag-setor">
-                  {{ setor.nome }}
-                </span>
-                <span v-if="colab.setores && colab.setores.length > 2" class="tag tag-more">
-                  +{{ colab.setores.length - 2 }}
-                </span>
-                <span v-else-if="!colab.setores || colab.setores.length === 0" class="no-data">—</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge badge-cargo">{{ colab.cargo && colab.cargo.nome ? colab.cargo.nome : '-' }}</span>
-            </td>
-            <td>{{ colab.cargo && colab.cargo.funcao ? colab.cargo.funcao : '-' }}</td>
-            <td>
-              <span class="badge badge-equipe">{{ colab.cargo && colab.cargo.equipe ? colab.cargo.equipe : '-' }}</span>
-            </td>
-            <td>
-              <span class="level-indicator" :class="'level-' + (colab.cargo?.nivel || 'none')">
-                {{ colab.cargo && colab.cargo.nivel ? colab.cargo.nivel : '-' }}
+    <table v-else class="modern-table">
+      <thead>
+        <tr>
+          <th @click="ordenarPor('nome')" style="cursor:pointer">Nome <i class="fas fa-sort"></i></th>
+          <th>Sobrenome</th>
+          <!-- <th>Meta Final</th> -->
+          <!-- <th>Meta Diária</th> -->
+          <th>Unidade</th>
+          <th>Cargo</th>
+          <th>Função</th>
+          <th>Equipe</th>
+          <th>Nível</th>
+          <th>Status</th>
+          <th>Meta</th>
+          <th>Tipo Pgto</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="colab in colaboradoresOrdenados" :key="colab.id">
+          <td>{{ colab.nome }}</td>
+          <td>{{ colab.sobrenome || '-' }}</td>
+          <!-- <td>
+            <span class="meta-value">
+              {{ colab.meta_colaborador && colab.meta_colaborador.meta_final !== undefined && colab.meta_colaborador.meta_final !== null ? colab.meta_colaborador.meta_final : '-' }}
+            </span>
+          </td>
+          <td>
+            <span class="meta-value">
+              {{ colab.meta_colaborador && colab.meta_colaborador.meta_diaria !== undefined && colab.meta_colaborador.meta_diaria !== null ? colab.meta_colaborador.meta_diaria : '-' }}
+            </span>
+          </td> -->
+          <td>
+            <div class="tag-container">
+              <span v-if="colab.setores && colab.setores.length" 
+                    v-for="setor in colab.setores.slice(0, 2)" 
+                    :key="setor.id" 
+                    class="tag tag-setor">
+                {{ setor.nome }}
               </span>
-            </td>
-            <td>
-              <span
-                :class="[
-                  'status-indicator',
-                  colab.data_inativado
-                    ? 'status-inativo'
-                    : (colab.data_afastamento
-                        ? (colab.data_retorno ? 'status-active' : 'status-afastado')
-                        : (colab.status === 'Ativo' ? 'status-active' : 'status-afastado'))
-                ]"
-              >
-                {{
-                  colab.data_inativado
-                    ? 'Inativo'
-                    : (colab.data_afastamento
-                        ? (colab.data_retorno ? 'Ativo' : 'Afastado')
-                        : (colab.status || 'Ativo'))
-                }}
+              <span v-if="colab.setores && colab.setores.length > 2" class="tag tag-more">
+                +{{ colab.setores.length - 2 }}
               </span>
-            </td>
-            <td>
-              <span class="meta-value">{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</span>
-            </td>
-            <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
-            <td>
-              <div class="action-buttons">
-                <button @click="editarColaborador(colab)" class="btn-action btn-edit">
-                  <i class="fas fa-edit"></i>
-                  <span>Editar</span>
-                </button>
-                <button @click="abrirVisaoMeta(colab)" class="btn-action btn-meta">
-                  <i class="fas fa-target"></i>
-                  <span>Meta</span>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    
+              <span v-else-if="!colab.setores || colab.setores.length === 0" class="no-data">—</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge badge-cargo">{{ colab.cargo && colab.cargo.nome ? colab.cargo.nome : '-' }}</span>
+          </td>
+          <td>{{ colab.cargo && colab.cargo.funcao ? colab.cargo.funcao : '-' }}</td>
+          <td>
+            <span class="badge badge-equipe">{{ colab.cargo && colab.cargo.equipe ? colab.cargo.equipe : '-' }}</span>
+          </td>
+          <td>
+            <span class="level-indicator" :class="'level-' + (colab.cargo?.nivel || 'none')">
+              {{ colab.cargo && colab.cargo.nivel ? colab.cargo.nivel : '-' }}
+            </span>
+          </td>
+          <td>
+            <span
+              :class="[
+                'status-indicator',
+                colab.data_inativado
+                  ? 'status-inativo'
+                  : (colab.data_afastamento
+                      ? (colab.data_retorno ? 'status-active' : 'status-afastado')
+                      : (colab.status === 'Ativo' ? 'status-active' : 'status-afastado'))
+              ]"
+            >
+              {{
+                colab.data_inativado
+                  ? 'Inativo'
+                  : (colab.data_afastamento
+                      ? (colab.data_retorno ? 'Ativo' : 'Afastado')
+                      : (colab.status || 'Ativo'))
+              }}
+            </span>
+          </td>
+          <td>
+            <span class="meta-value">{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</span>
+          </td>
+          <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
+          <td>
+            <div class="action-buttons">
+              <button @click="editarColaborador(colab)" class="btn-action btn-edit">
+                <i class="fas fa-edit"></i>
+                <span>Editar</span>
+              </button>
+              <button @click="abrirVisaoMeta(colab)" class="btn-action btn-meta">
+                <i class="fas fa-target"></i>
+                <span>Meta</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <!-- Modal de Edição -->
     <div v-if="showModal" class="modal-overlay" @click="fecharModal">
       <div class="modal-content" @click.stop>
@@ -154,7 +115,6 @@
           <h3><i class="fas fa-user-edit"></i> Editar Colaborador</h3>
           <button @click="fecharModal" class="btn-close">&times;</button>
         </div>
-        
         <div class="modal-body">
           <form @submit.prevent="salvarEdicao">
             <div class="form-row">
@@ -180,9 +140,7 @@
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.cargo_nome">
                   <option value="">Selecione o nome do cargo</option>
-                  <option v-for="nome in opcoesCargoSeparadas.nomes" :key="nome" :value="nome">
-                    {{ nome }}
-                  </option>
+                  <option v-for="nome in opcoesCargoSeparadas.nomes" :key="nome" :value="nome">{{ nome }}</option>
                 </select>
               </div>
             </div>
@@ -191,9 +149,7 @@
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.cargo_funcao">
                   <option value="">Selecione a função</option>
-                  <option v-for="funcao in opcoesCargoSeparadas.funcoes" :key="funcao" :value="funcao">
-                    {{ funcao }}
-                  </option>
+                  <option v-for="funcao in opcoesCargoSeparadas.funcoes" :key="funcao" :value="funcao">{{ funcao }}</option>
                 </select>
               </div>
             </div>
@@ -202,9 +158,7 @@
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.cargo_equipe">
                   <option value="">Selecione a equipe</option>
-                  <option v-for="equipe in opcoesCargoSeparadas.equipes" :key="equipe" :value="equipe">
-                    {{ equipe }}
-                  </option>
+                  <option v-for="equipe in opcoesCargoSeparadas.equipes" :key="equipe" :value="equipe">{{ equipe }}</option>
                 </select>
               </div>
             </div>
@@ -213,9 +167,7 @@
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.cargo_nivel">
                   <option value="">Selecione o nível</option>
-                  <option v-for="nivel in opcoesCargoSeparadas.niveis" :key="nivel" :value="nivel">
-                    {{ nivel }}
-                  </option>
+                  <option v-for="nivel in opcoesCargoSeparadas.niveis" :key="nivel" :value="nivel">{{ nivel }}</option>
                 </select>
               </div>
             </div>
@@ -223,9 +175,7 @@
               <label><i class="fas fa-building"></i> Unidade</label>
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.setor_id">
-                  <option v-for="setor in setores" :key="setor.id" :value="setor.id">
-                    {{ setor.nome }}
-                  </option>
+                  <option v-for="setor in setores" :key="setor.id" :value="setor.id">{{ setor.nome }}</option>
                 </select>
               </div>
             </div>
@@ -233,11 +183,7 @@
               <label><i class="fas fa-money-bill-wave"></i> Tipo de Pagamento</label>
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.tipo_pgto" class="custom-select-tipo-pgto">
-                  <option v-for="opcao in opcoesTipoPgto" :key="opcao" :value="opcao">
-                    <span v-if="opcao === 'Pela unidade'">🔢 Pela unidade</span>
-                    <span v-else-if="opcao === 'Pelo que realizou'">✅ Pelo que realizou</span>
-                    <span v-else>{{ opcao }}</span>
-                  </option>
+                  <option v-for="opcao in opcoesTipoPgto" :key="opcao" :value="opcao">{{ opcao }}</option>
                 </select>
               </div>
             </div>
@@ -245,9 +191,7 @@
               <label><i class="fas fa-bullseye"></i> Meta</label>
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.meta" class="custom-select-tipo-pgto">
-                  <option v-for="valor in colaboradorEditando.tipo_pgto === 'Pela unidade' ? opcoesValoresUnidade : opcoesValoresRealizados" :key="valor" :value="valor">
-                    {{ valor }}
-                  </option>
+                  <option v-for="valor in colaboradorEditando.tipo_pgto === 'Pela unidade' ? opcoesValoresUnidade : opcoesValoresRealizados" :key="valor" :value="valor">{{ valor }}</option>
                 </select>
               </div>
             </div>
@@ -267,15 +211,11 @@
                 <option value="Outros">Outros</option>
               </select>
             </div>
-            
             <!-- Campo adicional quando selecionar "Outros" -->
             <div class="form-group" v-if="colaboradorEditando.motivo_afastamento === 'Outros'">
               <label><i class="fas fa-edit"></i> Especifique o motivo</label>
-              <textarea v-model="colaboradorEditando.motivo_outros" 
-                        placeholder="Descreva o motivo específico"
-                        rows="3"></textarea>
+              <textarea v-model="colaboradorEditando.motivo_outros" placeholder="Descreva o motivo específico" rows="3"></textarea>
             </div>
-            
             <div class="form-group">
               <label><i class="fas fa-calendar-times"></i> Data de Afastamento</label>
               <input v-model="colaboradorEditando.data_afastamento" type="date" placeholder="Data do afastamento" />
@@ -296,7 +236,6 @@
             </div>
           </form>
         </div>
-        
         <div class="modal-footer">
           <button type="button" @click="fecharModal" class="btn-secondary">
             <i class="fas fa-times"></i> Cancelar
@@ -710,6 +649,27 @@ export default {
 </script>
 
 <style scoped>
+/* Spinner para loading */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+.spinner {
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #3498db;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 /* Import Font Awesome se não estiver já incluído */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 

@@ -132,13 +132,7 @@
     <!-- Conteúdo Principal -->
     <main class="main-content" :class="{ expanded: isCollapsed }">
       <component :is="panelComponent" v-if="activePanel !== 'quadroColaboradores' && activePanel !== 'metaColaborador'" />
-      <QuadroColaboradores v-else-if="activePanel === 'quadroColaboradores'" :colaboradores="funcionarios.map(f => ({
-        id: f.id,
-        nome: f.nome,
-        sobrenome: f.sobrenome,
-        setores: f.setores,
-        cargo: f.cargo
-      }))" />
+  <QuadroColaboradores v-else-if="activePanel === 'quadroColaboradores'" :colaboradores="funcionarios" />
       <MetaColaborador v-else-if="activePanel === 'metaColaborador'" :colaboradores="funcionarios" />
     </main>
   </div>

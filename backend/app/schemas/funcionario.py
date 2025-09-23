@@ -65,7 +65,7 @@ class Funcionario(FuncionarioBase):
     grupos_email: List[GrupoEmailOut] = []
     grupos_pasta: List[GrupoPastaOut] = []
     grupos_whatsapp: List[GrupoWhatsappOut] = []
-    cargo: Optional[str] = None
+    cargo: Optional[CargoOut] = None
     data_admissao: str = ''
     data_inativado: str = ''
     cpf: Optional[str] = None
@@ -73,5 +73,5 @@ class Funcionario(FuncionarioBase):
     tipo_contrato: Optional[str] = None
     data_retorno: Optional[str] = None
     motivo_afastamento: Optional[str] = None
-class Config:
+    class Config:
         from_attributes = True
