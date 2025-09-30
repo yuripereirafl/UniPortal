@@ -66,39 +66,136 @@
         <table class="modern-table">
           <thead>
             <tr>
-              <th @click="toggleOrdenacaoNome" class="sortable">
-                <div class="th-content">
-                  <span>Nome do Grupo</span>
-                  <i class="fas fa-sort sort-icon" :class="{ 
-                    'fa-sort-up': ordenacaoNome === 'asc',
-                    'fa-sort-down': ordenacaoNome === 'desc'
-                  }"></i>
+              <th style="text-align:left; vertical-align:middle;">
+                <div class="th-content" style="justify-content:flex-start; align-items:center; height:56px; display:flex; flex-direction:row;">
+                  <i class="fas fa-envelope" style="align-self:center;"></i>
+                  <span style="margin-left:6px; align-self:center; font-size:1.08rem;">Nome do Grupo</span>
                 </div>
               </th>
-              <th class="actions-column">Ações</th>
+              <th style="text-align:center;">
+                <div class="th-content" style="justify-content:center;">
+                  <i class="fas fa-users participants-icon"></i>
+                  <span style="margin-left:6px;">Participantes</span>
+                </div>
+              </th>
+              <th class="actions-column" style="text-align:center;">
+                <span style="display:inline-block;">Ações</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="grupo in gruposFiltrados" :key="grupo.id" class="table-row">
-              <td class="name-cell">
-                <div class="name-content">
-                  <div class="grupo-icon">
+              <td class="name-cell" style="vertical-align:middle;">
+                <div class="grupo-row" style="display:flex; align-items:center; gap:14px; min-height:38px;">
+                  <div class="grupo-icon" style="background:#2563eb; color:#fff; border-radius:8px; width:38px; height:38px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">
                     <i class="fas fa-envelope"></i>
                   </div>
-                  <span class="grupo-name">{{ grupo.nome }}</span>
+                  <div style="display:flex; flex-direction:column; justify-content:center;">
+                    <span class="grupo-nome" style="font-weight:700; color:#222; font-size:1.08rem; line-height:1.2;">{{ grupo.nome }}</span>
+                    <span class="grupo-email" style="font-size:0.98rem; color:#2563eb; line-height:1.2;">{{ grupo.email }}</span>
+                  </div>
                 </div>
               </td>
-              <td class="actions-cell">
-                <button class="action-btn edit-btn" @click="abrirEditar(grupo)" title="Editar">
+              <td class="participants-cell" style="text-align:center; vertical-align:middle;">
+                <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                  <i class="fas fa-users participants-icon small" aria-hidden="true" style="margin:0;"></i>
+                  <span style="font-weight:500; color:#222;">{{ grupo.qtd_participantes }} participante(s)</span>
+                </div>
+              </td>
+              <td class="actions-cell" style="text-align:center; vertical-align:middle;">
+                <button class="action-btn edit-btn" @click="abrirEditar(grupo)" title="Editar" style="background:#2563eb; color:#fff; margin-right:6px;">
                   <i class="fas fa-edit"></i>
                 </button>
-                <button class="action-btn delete-btn" @click="excluirGrupo(grupo.id)" title="Excluir">
-                  <i class="fas fa-trash-alt"></i>
+                <button class="action-btn delete-btn" @click="excluirGrupo(grupo.id)" title="Excluir" style="background:#ef4444; color:#fff; margin-right:6px;">
+                  <i class="fas fa-trash"></i>
+                </button>
+                <button class="action-btn users-btn" @click="abrirModalParticipantes(grupo)" title="Participantes" style="background:#f3f4f6; color:#2563eb;">
+                  <i class="fas fa-users"></i>
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Modal de Gerenciar Participantes (padrão premium azul) -->
+    <div v-if="mostrarModalParticipantes" class="modal-overlay premium-modal-bg" @click="fecharModalParticipantes">
+      <div class="modal-container large-modal premium-modal" @click.stop>
+        <div class="modal-header premium-modal-header-blue">
+          <h3>
+            <i class="fas fa-users-cog"></i>
+            Gerenciar Participantes - {{ grupoSelecionado?.nome }}
+          </h3>
+          <button @click="fecharModalParticipantes" class="modal-close premium-close-btn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body premium-modal-body">
+          <div class="participants-section">
+            <h4 style="display:flex; align-items:center; gap:10px;">
+              <i class="fas fa-users participants-icon small" aria-hidden="true"></i>
+              <span>Participantes Atuais ({{ participantes.length }})</span>
+            </h4>
+            <div class="participants-list premium-list-scroll-blue">
+              <div v-if="loadingParticipantes" class="list-loading">Carregando participantes...</div>
+              <div v-else>
+                <div v-for="participante in participantes.slice().sort((a, b) => ((a.nome + ' ' + a.sobrenome).localeCompare(b.nome + ' ' + b.sobrenome)))" :key="participante.id" class="participant-item premium-item-compact">
+                  <div class="participant-info">
+                    <div class="participant-avatar premium-avatar-blue">
+                      <i class="fas fa-user"></i>
+                    </div>
+                    <div class="participant-details">
+                      <span class="participant-name">{{ participante.nome }} {{ participante.sobrenome }}</span>
+                      <span class="participant-email">{{ participante.email }}</span>
+                    </div>
+                  </div>
+                  <button @click="removerParticipante(participante.id)" class="btn-remove premium-btn-blue">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="add-participants-section">
+            <h4>
+              <i class="fas fa-user-plus"></i>
+              Adicionar Participantes
+            </h4>
+            <div class="search-participants premium-search-bar">
+              <input 
+                v-model="filtroFuncionarios" 
+                class="form-input premium-input-blue"
+                placeholder="Buscar funcionários..." 
+              />
+            </div>
+            <div class="available-participants premium-list-scroll-blue">
+              <div v-if="loadingDisponiveis" class="list-loading">Carregando funcionários...</div>
+              <div v-else>
+                <div v-for="funcionario in funcionariosFiltrados" :key="funcionario.id" class="participant-item premium-item-compact">
+                  <div class="participant-info">
+                    <div class="participant-avatar premium-avatar-blue">
+                      <i class="fas fa-user"></i>
+                    </div>
+                    <div class="participant-details">
+                      <span class="participant-name">{{ funcionario.nome }} {{ funcionario.sobrenome }}</span>
+                      <span class="participant-email">{{ funcionario.email }}</span>
+                    </div>
+                  </div>
+                  <button @click="adicionarParticipante(funcionario.id)" class="btn-add premium-btn-blue">
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer premium-modal-footer">
+          <button type="button" @click="fecharModalParticipantes" class="btn-primary btn-primary-blue">
+            <i class="fas fa-check"></i>
+            CONCLUÍDO
+          </button>
+        </div>
       </div>
     </div>
 
@@ -137,7 +234,14 @@ export default {
         nome: ''
       },
       buscaGrupo: '',
-      ordenacaoNome: 'asc'
+      ordenacaoNome: 'asc',
+      mostrarModalParticipantes: false,
+      grupoSelecionado: null,
+      participantes: [],
+      funcionariosDisponiveis: [],
+  loadingParticipantes: false,
+  loadingDisponiveis: false,
+      filtroFuncionarios: ''
     }
   },
   computed: {
@@ -158,15 +262,133 @@ export default {
         if (nomeA > nomeB) return this.ordenacaoNome === 'asc' ? 1 : -1;
         return 0;
       });
+    },
+
+    // Computed que retorna a lista de funcionários disponíveis já filtrada pela caixa de busca
+    funcionariosFiltrados() {
+      const funcionarios = Array.isArray(this.funcionariosDisponiveis) ? this.funcionariosDisponiveis : [];
+      const participantes = Array.isArray(this.participantes) ? this.participantes : [];
+      // Remove já participantes
+      let disponiveis = funcionarios.filter(f => !participantes.some(p => p.id === f.id));
+      if (this.filtroFuncionarios) {
+        const termo = this.filtroFuncionarios.toLowerCase();
+        disponiveis = disponiveis.filter(f =>
+          (f.nome && f.nome.toLowerCase().includes(termo)) ||
+          (f.sobrenome && f.sobrenome.toLowerCase().includes(termo)) ||
+          (f.email && f.email.toLowerCase().includes(termo))
+        );
+      }
+      // Ordena A -> Z pelo nome + sobrenome
+      disponiveis = disponiveis.slice().sort((a, b) => {
+        const nomeA = ((a.nome || '') + ' ' + (a.sobrenome || '')).toLowerCase();
+        const nomeB = ((b.nome || '') + ' ' + (b.sobrenome || '')).toLowerCase();
+        return nomeA.localeCompare(nomeB, 'pt-BR');
+      });
+      return disponiveis;
     }
   },
   async mounted() {
     await this.carregarGrupos();
   },
   methods: {
+    async abrirModalParticipantes(grupo) {
+      // Define seleção e abre modal imediatamente para melhor UX
+      this.grupoSelecionado = grupo;
+      this.mostrarModalParticipantes = true;
+      // limpa listas enquanto carrega
+      this.participantes = [];
+      this.funcionariosDisponiveis = [];
+      // ativa indicadores de loading
+      this.loadingParticipantes = true;
+      this.loadingDisponiveis = true;
+      // carrega em paralelo para reduzir tempo total
+      const promises = [
+        this.carregarParticipantes(grupo.id),
+        this.carregarFuncionariosDisponiveis(grupo.id)
+      ];
+      const results = await Promise.allSettled(promises);
+      // garante que flags sejam desativadas mesmo se houver erro
+      this.loadingParticipantes = false;
+      this.loadingDisponiveis = false;
+      // opcional: log de erros
+      results.forEach(r => {
+        if (r.status === 'rejected') console.error(r.reason);
+      });
+    },
+    fecharModalParticipantes() {
+      // sincroniza contador antes de fechar
+      if (this.grupoSelecionado) {
+        const idx = this.grupos.findIndex(g => g.id === this.grupoSelecionado.id);
+        if (idx !== -1) this.grupos[idx].qtd_participantes = Array.isArray(this.participantes) ? this.participantes.length : 0;
+      }
+      this.mostrarModalParticipantes = false;
+      this.grupoSelecionado = null;
+      this.participantes = [];
+      this.funcionariosDisponiveis = [];
+      this.filtroFuncionarios = '';
+    },
+    async carregarParticipantes(grupoId) {
+      try {
+  const res = await axios.get(`${API_BASE_URL}/grupos-email/${grupoId}`);
+  this.participantes = res.data.funcionarios || [];
+  return this.participantes;
+      } catch (error) {
+        console.error('Erro ao carregar participantes:', error);
+        this.participantes = [];
+  throw error;
+      }
+    },
+    async carregarFuncionariosDisponiveis(grupoId) {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/grupos-email/${grupoId}/disponiveis`);
+        this.funcionariosDisponiveis = res.data || [];
+  return this.funcionariosDisponiveis;
+      } catch (error) {
+        console.error('Erro ao carregar funcionários disponíveis:', error);
+        this.funcionariosDisponiveis = [];
+  throw error;
+      }
+    },
+    async adicionarParticipante(funcionarioId) {
+      if (!this.grupoSelecionado) return;
+      try {
+        const res = await axios.post(`${API_BASE_URL}/grupos-email/${this.grupoSelecionado.id}/adicionar-participante/${funcionarioId}`);
+        const body = res && res.data ? res.data : null;
+        if (body && Array.isArray(body.funcionarios)) {
+          this.participantes = body.funcionarios;
+          const idx = this.grupos.findIndex(g => g.id === this.grupoSelecionado.id);
+          if (idx !== -1) this.grupos[idx].qtd_participantes = body.qtd_participantes || this.participantes.length;
+          await this.carregarFuncionariosDisponiveis(this.grupoSelecionado.id);
+        } else {
+          await this.carregarParticipantes(this.grupoSelecionado.id);
+          await this.carregarFuncionariosDisponiveis(this.grupoSelecionado.id);
+        }
+      } catch (error) {
+        console.error('Erro ao adicionar participante:', error);
+      }
+    },
+    async removerParticipante(funcionarioId) {
+      if (!this.grupoSelecionado) return;
+      try {
+        const res = await axios.delete(`${API_BASE_URL}/grupos-email/${this.grupoSelecionado.id}/remover-participante/${funcionarioId}`);
+        const body = res && res.data ? res.data : null;
+        if (body && Array.isArray(body.funcionarios)) {
+          this.participantes = body.funcionarios;
+          const idx = this.grupos.findIndex(g => g.id === this.grupoSelecionado.id);
+          if (idx !== -1) this.grupos[idx].qtd_participantes = body.qtd_participantes || this.participantes.length;
+          await this.carregarFuncionariosDisponiveis(this.grupoSelecionado.id);
+        } else {
+          await this.carregarParticipantes(this.grupoSelecionado.id);
+          await this.carregarFuncionariosDisponiveis(this.grupoSelecionado.id);
+        }
+      } catch (error) {
+        console.error('Erro ao remover participante:', error);
+      }
+    },
     toggleOrdenacaoNome() {
       this.ordenacaoNome = this.ordenacaoNome === 'asc' ? 'desc' : 'asc';
     },
+  // ...existing methods...
     async carregarGrupos() {
       const res = await axios.get(`${API_BASE_URL}/grupos-email/`);
       this.grupos = res.data;
@@ -703,10 +925,224 @@ export default {
   background: #e5e7eb;
 }
 
+.premium-modal-bg {
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(5px);
+}
+.premium-modal {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.18);
+  max-width: 700px;
+  width: 95%;
+  overflow: hidden;
+  animation: modalSlideIn 0.3s ease-out;
+}
+/* Garantir que o modal não ultrapasse a viewport e permita scroll interno */
+.premium-modal {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.premium-modal-header {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  color: white;
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.premium-modal-header-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  color: white;
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.premium-modal-body {
+  padding: 1.5rem;
+  background: #f8fafc;
+}
+.premium-modal-footer {
+  background: #f7fafc;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #e2e8f0;
+}
+.premium-list-scroll {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 0.5rem;
+  margin-bottom: 1.2rem;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #25D366 #e2e8f0;
+}
+.premium-list-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.premium-list-scroll::-webkit-scrollbar-thumb {
+  background: #25D366;
+  border-radius: 8px;
+}
+.premium-list-scroll::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 8px;
+}
+.premium-item-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.3rem;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: background 0.2s ease;
+}
+.premium-item-compact:hover {
+  background: #f7fafc;
+}
+.premium-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  margin-right: 0.7rem;
+}
+.premium-avatar-blue {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  margin-right: 0.7rem;
+}
+.participant-details {
+  display: flex;
+  flex-direction: column;
+}
+.participant-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Ícone de participantes destacado usado no cabeçalho e nas células */
+.participants-icon {
+  background: linear-gradient(135deg, #e6f2ff 0%, #dbeafe 100%);
+  color: #1e40af;
+  padding: 8px;
+  border-radius: 10px;
+  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(37,99,235,0.12);
+}
+.participants-icon.small {
+  padding: 6px;
+  font-size: 0.95rem;
+  border-radius: 8px;
+}
+.participant-name {
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 0.95rem;
+  letter-spacing: 0.2px;
+}
+.participant-email {
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: 500;
+}
+.premium-btn {
+  background: #f8d7da;
+  color: #c82333;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.premium-btn.btn-add {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.premium-btn-blue {
+  background: #e0e7ff;
+  color: #1e40af;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.premium-btn-blue.btn-add {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.premium-btn:hover {
+  filter: brightness(0.95);
+}
+.premium-btn-blue:hover {
+  filter: brightness(0.95);
+}
+.btn-primary-blue {
+  background: linear-gradient(45deg, #2563eb, #1e40af);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 25px;
+  padding: 0.9rem 1.8rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.18);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.btn-primary-blue:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Corrige hover do botão combinado com .btn-primary para manter o azul */
+.btn-primary.btn-primary-blue:hover,
+.premium-modal-footer .btn-primary.btn-primary-blue:hover {
+  background: linear-gradient(45deg, #1f5fe8, #17378f);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(37,99,235,0.22);
+}
 @keyframes modalSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-20px) scale(0.95);
+    transform: translateY(-30px) scale(0.9);
   }
   to {
     opacity: 1;
@@ -781,5 +1217,66 @@ export default {
     margin: 20px;
     padding: 24px;
   }
+}
+.premium-close-btn {
+  background: #e0e7ff;
+  color: #1e40af;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.premium-close-btn:hover {
+  background: #2563eb;
+  color: #fff;
+}
+.premium-list-scroll-blue {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 0.5rem;
+  margin-bottom: 1.2rem;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2563eb #e0e7ff;
+}
+.premium-list-scroll-blue::-webkit-scrollbar {
+  width: 7px;
+}
+.premium-list-scroll-blue::-webkit-scrollbar-thumb {
+  background: #2563eb;
+  border-radius: 8px;
+}
+.premium-list-scroll-blue::-webkit-scrollbar-track {
+  background: #e0e7ff;
+  border-radius: 8px;
+}
+.premium-search-bar {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.premium-input-blue {
+  border: 2px solid #2563eb;
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  width: 100%;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.07);
+}
+.premium-input-blue:focus {
+  outline: none;
+  border-color: #1e40af;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.13);
 }
 </style>

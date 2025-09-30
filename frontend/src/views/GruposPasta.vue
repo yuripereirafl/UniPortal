@@ -85,6 +85,7 @@
                 </div>
               </th>
               <th>Descrição</th>
+              <th style="text-align:center;"><i class="fas fa-users participants-icon"></i> Participantes</th>
               <th class="actions-column">Ações</th>
             </tr>
           </thead>
@@ -102,12 +103,21 @@
                 <span v-if="grupo.descricao" class="description-text">{{ grupo.descricao }}</span>
                 <span v-else class="no-description">Sem descrição</span>
               </td>
+              <td class="participants-cell" style="text-align:center; vertical-align:middle;">
+                <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                  <i class="fas fa-users participants-icon small" aria-hidden="true" style="margin:0;"></i>
+                  <span style="font-weight:500;">{{ grupo.qtd_participantes }} participante(s)</span>
+                </div>
+              </td>
               <td class="actions-cell">
                 <button class="action-btn edit-btn" @click="abrirEditar(grupo)" title="Editar">
                   <i class="fas fa-edit"></i>
                 </button>
                 <button class="action-btn delete-btn" @click="excluirGrupo(grupo.id)" title="Excluir">
                   <i class="fas fa-trash-alt"></i>
+                </button>
+                <button class="action-btn users-btn" @click="abrirModalParticipantes(grupo)" title="Participantes">
+                  <i class="fas fa-users"></i>
                 </button>
               </td>
             </tr>
@@ -116,23 +126,107 @@
       </div>
     </div>
 
-    <!-- Modal -->
-    <div v-if="showForm" class="modal-overlay" @click="fecharModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ editando ? 'Editar Grupo de Pastas' : 'Novo Grupo de Pastas' }}</h3>
-          <button class="close-button" @click="fecharModal">
+    <!-- Modal de Gerenciar Participantes -->
+    <div v-if="mostrarModalParticipantes" class="modal-overlay premium-modal-bg" @click="fecharModalParticipantes">
+      <div class="modal-container large-modal premium-modal" @click.stop>
+        <div class="modal-header premium-modal-header-blue">
+          <h3>
+            <i class="fas fa-users-cog"></i>
+            Gerenciar Participantes - {{ grupoSelecionado?.nome }}
+          </h3>
+          <button @click="fecharModalParticipantes" class="modal-close premium-close-btn">
             <i class="fas fa-times"></i>
           </button>
         </div>
-        <form @submit.prevent="editando ? salvarEdicaoGrupo() : cadastrarGrupo()">
-          <input v-model="form.nome" placeholder="Nome do Grupo" required />
-          <textarea v-model="form.descricao" placeholder="Descrição (opcional)" rows="3"></textarea>
-          <div class="modal-actions">
-            <button type="submit" class="btn-primary">Salvar</button>
-            <button type="button" @click="fecharModal" class="btn-secondary">Cancelar</button>
+        <div class="modal-body premium-modal-body">
+          <div class="participants-section">
+            <h4 style="display:flex; align-items:center; gap:10px;">
+              <i class="fas fa-users participants-icon small" aria-hidden="true"></i>
+              <span>Participantes Atuais ({{ participantes.length }})</span>
+            </h4>
+            <div class="participants-list premium-list-scroll-blue">
+              <div v-if="loadingParticipantes" class="list-loading">Carregando participantes...</div>
+              <div v-else>
+                <div v-for="participante in participantes.slice().sort((a, b) => ((a.nome + ' ' + a.sobrenome).localeCompare(b.nome + ' ' + b.sobrenome)))" :key="participante.id" class="participant-item premium-item-compact">
+                  <div class="participant-info">
+                    <div class="participant-avatar premium-avatar-blue">
+                      <i class="fas fa-user"></i>
+                    </div>
+                    <div class="participant-details">
+                      <span class="participant-name">{{ participante.nome }} {{ participante.sobrenome }}</span>
+                      <span class="participant-pasta">{{ participante.pasta }}</span>
+                    </div>
+                  </div>
+                  <button @click="removerParticipante(participante.id)" class="btn-remove premium-btn-blue">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </form>
+          <div class="add-participants-section">
+            <h4>
+              <i class="fas fa-user-plus"></i>
+              Adicionar Participantes
+            </h4>
+            <div class="search-participants premium-search-bar">
+              <input 
+                v-model="filtroFuncionarios" 
+                class="form-input premium-input-blue"
+                placeholder="Buscar funcionários..." 
+              />
+            </div>
+            <div class="available-participants premium-list-scroll-blue">
+              <div v-if="loadingDisponiveis" class="list-loading">Carregando funcionários...</div>
+              <div v-else>
+                <div v-for="funcionario in funcionariosFiltrados" :key="funcionario.id" class="participant-item premium-item-compact">
+                  <div class="participant-info">
+                    <div class="participant-avatar premium-avatar-blue">
+                      <i class="fas fa-user"></i>
+                    </div>
+                    <div class="participant-details">
+                      <span class="participant-name">{{ funcionario.nome }} {{ funcionario.sobrenome }}</span>
+                      <span class="participant-pasta">{{ funcionario.pasta }}</span>
+                    </div>
+                  </div>
+                  <button @click="adicionarParticipante(funcionario.id)" class="btn-add premium-btn-blue">
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer premium-modal-footer">
+          <button type="button" @click="fecharModalParticipantes" class="btn-primary btn-primary-blue">
+            <i class="fas fa-check"></i>
+            CONCLUÍDO
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Criar/Editar Grupo (Premium) -->
+    <div v-if="showForm" class="modal-overlay premium-modal-bg" @click="fecharModal">
+      <div class="modal-container large-modal premium-modal" @click.stop>
+        <div class="modal-header premium-modal-header-blue">
+          <h3>{{ editando ? 'Editar Grupo de Pastas' : 'Novo Grupo de Pastas' }}</h3>
+          <button class="modal-close premium-close-btn" @click="fecharModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body premium-modal-body">
+          <form @submit.prevent="editando ? salvarEdicaoGrupo() : cadastrarGrupo()">
+            <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:12px;">
+              <input v-model="form.nome" placeholder="Nome do Grupo" required class="form-input" />
+              <textarea v-model="form.descricao" placeholder="Descrição (opcional)" rows="3" class="form-input" style="min-width:260px;"></textarea>
+            </div>
+            <div style="display:flex; gap:12px; justify-content:flex-end;">
+              <button type="button" @click="fecharModal" class="btn-secondary">Cancelar</button>
+              <button type="submit" class="btn-primary btn-primary-blue">Salvar</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
@@ -154,6 +248,14 @@ export default {
       },
       buscaGrupo: '',
       ordenacaoNome: 'asc',
+  // participantes modal state
+  mostrarModalParticipantes: false,
+  grupoSelecionado: null,
+  participantes: [],
+  funcionariosDisponiveis: [],
+  loadingParticipantes: false,
+  loadingDisponiveis: false,
+  filtroFuncionarios: ''
     }
   },
   computed: {
@@ -173,6 +275,25 @@ export default {
     },
     gruposComDescricao() {
       return this.grupos.filter(g => g.descricao && g.descricao.trim() !== '').length;
+    }
+    ,
+    funcionariosFiltrados() {
+      const funcionarios = Array.isArray(this.funcionariosDisponiveis) ? this.funcionariosDisponiveis : [];
+      const participantes = Array.isArray(this.participantes) ? this.participantes : [];
+      let disponiveis = funcionarios.filter(f => !participantes.some(p => p.id === f.id));
+      if (this.filtroFuncionarios) {
+        const termo = this.filtroFuncionarios.toLowerCase();
+        disponiveis = disponiveis.filter(f =>
+          (f.nome && f.nome.toLowerCase().includes(termo)) ||
+          (f.sobrenome && f.sobrenome.toLowerCase().includes(termo)) ||
+          (f.email && f.email.toLowerCase().includes(termo))
+        );
+      }
+      return disponiveis.slice().sort((a, b) => {
+        const nomeA = ((a.nome || '') + ' ' + (a.sobrenome || '')).toLowerCase();
+        const nomeB = ((b.nome || '') + ' ' + (b.sobrenome || '')).toLowerCase();
+        return nomeA.localeCompare(nomeB, 'pt-BR');
+      });
     }
   },
   methods: {
@@ -210,6 +331,101 @@ export default {
       this.editando = true;
       this.showForm = true;
     },
+    async abrirModalParticipantes(grupo) {
+      this.grupoSelecionado = grupo;
+      this.mostrarModalParticipantes = true;
+      this.participantes = [];
+      this.funcionariosDisponiveis = [];
+      this.loadingParticipantes = true;
+      this.loadingDisponiveis = true;
+      const promises = [
+        this.carregarParticipantes(grupo.id),
+        this.carregarFuncionariosDisponiveis(grupo.id)
+      ];
+      const results = await Promise.allSettled(promises);
+      this.loadingParticipantes = false;
+      this.loadingDisponiveis = false;
+      results.forEach(r => { if (r.status === 'rejected') console.error(r.reason); });
+    },
+    fecharModalParticipantes() {
+      // atualiza contador no grupo pai antes de fechar
+      if (this.grupoSelecionado) {
+        const idx = this.grupos.findIndex(g => g.id === this.grupoSelecionado.id);
+        if (idx !== -1) {
+          this.grupos[idx].qtd_participantes = Array.isArray(this.participantes) ? this.participantes.length : 0;
+        }
+      }
+      this.mostrarModalParticipantes = false;
+      this.grupoSelecionado = null;
+      this.participantes = [];
+      this.funcionariosDisponiveis = [];
+      this.filtroFuncionarios = '';
+    },
+    async carregarParticipantes(grupoId) {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/grupos-pasta/${grupoId}`);
+        // Aceita vários formatos de resposta: {funcionarios: [...]}, {value: [...]}, ou array direto
+        const body = res && res.data ? res.data : [];
+        if (Array.isArray(body)) {
+          this.participantes = body;
+        } else if (Array.isArray(body.funcionarios)) {
+          this.participantes = body.funcionarios;
+        } else if (Array.isArray(body.value)) {
+          this.participantes = body.value;
+        } else {
+          this.participantes = [];
+        }
+        return this.participantes;
+      } catch (error) {
+        console.error('Erro ao carregar participantes:', error);
+        this.participantes = [];
+        throw error;
+      }
+    },
+    async carregarFuncionariosDisponiveis(grupoId) {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/grupos-pasta/${grupoId}/disponiveis`);
+        const body = res && res.data ? res.data : [];
+        if (Array.isArray(body)) {
+          this.funcionariosDisponiveis = body;
+        } else if (Array.isArray(body.value)) {
+          this.funcionariosDisponiveis = body.value;
+        } else {
+          this.funcionariosDisponiveis = [];
+        }
+        return this.funcionariosDisponiveis;
+      } catch (error) {
+        console.error('Erro ao carregar funcionários disponíveis:', error);
+        this.funcionariosDisponiveis = [];
+        throw error;
+      }
+    },
+    async adicionarParticipante(funcionarioId) {
+      if (!this.grupoSelecionado) return;
+      try {
+  await axios.post(`${API_BASE_URL}/grupos-pasta/${this.grupoSelecionado.id}/adicionar-participante/${funcionarioId}`);
+  await this.carregarParticipantes(this.grupoSelecionado.id);
+  // atualiza contador no grupo principal
+  const idxAdd = this.grupos.findIndex(g => g.id === this.grupoSelecionado.id);
+  if (idxAdd !== -1) this.grupos[idxAdd].qtd_participantes = Array.isArray(this.participantes) ? this.participantes.length : 0;
+  await this.carregarFuncionariosDisponiveis(this.grupoSelecionado.id);
+      } catch (error) {
+        console.error('Erro ao adicionar participante:', error);
+      }
+    },
+    async removerParticipante(funcionarioId) {
+      if (!this.grupoSelecionado) return;
+      try {
+  await axios.delete(`${API_BASE_URL}/grupos-pasta/${this.grupoSelecionado.id}/remover-participante/${funcionarioId}`);
+  await this.carregarParticipantes(this.grupoSelecionado.id);
+  // atualiza contador no grupo principal
+  const idxRem = this.grupos.findIndex(g => g.id === this.grupoSelecionado.id);
+  if (idxRem !== -1) this.grupos[idxRem].qtd_participantes = Array.isArray(this.participantes) ? this.participantes.length : 0;
+  await this.carregarFuncionariosDisponiveis(this.grupoSelecionado.id);
+      } catch (error) {
+        console.error('Erro ao remover participante:', error);
+      }
+    },
     abrirModal() {
       this.showForm = true;
       this.editando = false;
@@ -224,7 +440,12 @@ export default {
     },
     async carregarGrupos() {
       const res = await axios.get(`${API_BASE_URL}/grupos-pasta/`);
-      this.grupos = res.data;
+      const data = res.data || [];
+      // Normaliza para garantir qtd_participantes mesmo que backend não retorne
+      this.grupos = data.map(g => ({
+        ...g,
+        qtd_participantes: typeof g.qtd_participantes === 'number' ? g.qtd_participantes : (Array.isArray(g.funcionarios) ? g.funcionarios.length : 0)
+      }));
     }
   },
   mounted() {
@@ -622,130 +843,146 @@ export default {
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
-/* Modal Styles */
+/* Modal Styles (premium) */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
 }
 
-.modal-content {
+.premium-modal-bg {
+  /* compatibility class used in template */
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(5px);
+}
+
+.modal-container,
+.premium-modal {
   background: white;
-  border-radius: 16px;
-  padding: 32px;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.18);
+  max-width: 700px; /* padronizado para 700px */
+  width: 95%;
+  overflow: hidden;
   animation: modalSlideIn 0.3s ease-out;
 }
 
-.modal-header {
+/* Garantia extra de sobreposição e tamanho para modal grande */
+.modal-container.large-modal {
+  z-index: 1100;
+  max-width: 900px;
+  width: 92%;
+}
+
+/* Garantir que o modal não ultrapasse a viewport e permita scroll interno */
+.premium-modal {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.large-modal {
+  max-width: 900px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.premium-modal-header {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  color: white;
+  padding: 1.2rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f3f4f6;
 }
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1f2937;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: #6b7280;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.close-button:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.modal-content form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.modal-content input,
-.modal-content textarea {
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.modal-content input:focus,
-.modal-content textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-.modal-actions .btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
+.premium-modal-header-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
   color: white;
-  padding: 12px 24px;
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.premium-modal-body {
+  padding: 1.5rem;
+  background: #f8fafc;
+}
+.premium-modal-footer {
+  background: #f7fafc;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #e2e8f0;
+}
+
+.premium-list-scroll-blue {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 0.5rem;
+  margin-bottom: 1.2rem;
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2563eb #e0e7ff;
+}
+.premium-list-scroll-blue::-webkit-scrollbar {
+  width: 7px;
+}
+.premium-list-scroll-blue::-webkit-scrollbar-thumb {
+  background: #2563eb;
   border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+}
+.premium-list-scroll-blue::-webkit-scrollbar-track {
+  background: #e0e7ff;
+  border-radius: 8px;
 }
 
-.modal-actions .btn-primary:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+.premium-item-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.3rem;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: background 0.2s ease;
+}
+.premium-item-compact:hover {
+  background: #f7fafc;
 }
 
-.btn-secondary {
-  background: #f3f4f6;
+.premium-close-btn {
+  background: #e0e7ff;
+  color: #1e40af;
   border: none;
-  color: #374151;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s;
 }
-
-.btn-secondary:hover {
-  background: #e5e7eb;
+.premium-close-btn:hover {
+  background: #2563eb;
+  color: #fff;
 }
 
 @keyframes modalSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-20px) scale(0.95);
+    transform: translateY(-30px) scale(0.9);
   }
   to {
     opacity: 1;
@@ -820,5 +1057,233 @@ export default {
     margin: 20px;
     padding: 24px;
   }
+}
+
+/* Regras de estilo adicionais para itens de participantes e botões (mesmas do GruposEmail) */
+.premium-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  margin-right: 0.7rem;
+}
+.premium-avatar-blue {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  margin-right: 0.7rem;
+}
+.participant-details {
+  display: flex;
+  flex-direction: column;
+}
+.participant-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Ícone de participantes destacado usado no cabeçalho e nas células */
+.participants-icon {
+  background: linear-gradient(135deg, #e6f2ff 0%, #dbeafe 100%);
+  color: #1e40af;
+  padding: 8px;
+  border-radius: 10px;
+  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(37,99,235,0.12);
+}
+.participants-icon.small {
+  padding: 6px;
+  font-size: 0.95rem;
+  border-radius: 8px;
+}
+.participant-name {
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 0.95rem;
+  letter-spacing: 0.2px;
+}
+.participant-email {
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: 500;
+}
+/* Estilos para o campo de busca dentro do modal (buscar funcionários) */
+.premium-search-bar .form-input,
+.premium-search-bar .premium-input-blue {
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #374151;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.04);
+  transition: all 0.18s ease;
+}
+.premium-search-bar .form-input::placeholder,
+.premium-search-bar .premium-input-blue::placeholder {
+  color: #9ca3af;
+}
+.premium-search-bar .form-input:focus,
+.premium-search-bar .premium-input-blue:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 6px rgba(37,99,235,0.06);
+  transform: none;
+}
+
+/* Estilos gerais para inputs/textarea usados no modal de criação/edição */
+.form-input {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+  font-size: 14px;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.04);
+  transition: all 0.18s ease;
+  min-height: 40px;
+}
+.form-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 6px rgba(37,99,235,0.06);
+}
+textarea.form-input {
+  min-height: 64px;
+  resize: vertical;
+}
+
+/* Botão secundário (Cancelar) no modal */
+.btn-secondary {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-secondary:hover {
+  background: #f3f4f6;
+}
+
+/* Layout do formulário dentro do modal */
+.premium-modal-body form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.premium-modal-body form .form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.premium-modal-body form .form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.premium-btn {
+  background: #f8d7da;
+  color: #c82333;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.premium-btn.btn-add {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.premium-btn-blue {
+  background: #e0e7ff;
+  color: #1e40af;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.premium-btn-blue.btn-add {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.premium-btn:hover {
+  filter: brightness(0.95);
+}
+.premium-btn-blue:hover {
+  filter: brightness(0.95);
+}
+.btn-primary-blue {
+  background: linear-gradient(45deg, #2563eb, #1e40af);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 25px;
+  padding: 0.9rem 1.8rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.18);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.btn-primary-blue:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Corrige hover do botão combinado com .btn-primary para manter o azul */
+.btn-primary.btn-primary-blue:hover,
+.premium-modal-footer .btn-primary.btn-primary-blue:hover {
+  background: linear-gradient(45deg, #1f5fe8, #17378f);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(37,99,235,0.22);
+}
+/* Garantir avatar pequeno e alinhado no modal */
+.participant-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.6rem;
+}
+.participant-pasta {
+  font-size: 0.85rem;
+  color: #6b7280;
 }
 </style>

@@ -26,7 +26,7 @@ engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True,  
     pool_recycle=300,    
-    echo=False,
+    echo=True,
     connect_args={"options": "-csearch_path=rh_homologacao,rh,public"}          
 )
 
@@ -53,3 +53,4 @@ def test_connection():
 # Para debug (opcional)
 if __name__ == "__main__":
     test_connection()
+

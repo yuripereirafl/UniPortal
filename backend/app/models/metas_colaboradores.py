@@ -1,7 +1,11 @@
-from sqlalchemy import Column, String, Integer, Float, Date, BigInteger
+from sqlalchemy import Column, String, Integer, Float, Date
 from app.models.base import Base
 
-class MetasColaboradores(Base):
+# NOME DA CLASSE ALTERADO PARA O SINGULAR: MetaColaborador
+class MetaColaborador(Base):
+    """
+    Representa a tabela 'metas_colaboradores' no banco de dados.
+    """
     __tablename__ = 'metas_colaboradores'
     __table_args__ = {'schema': 'rh_homologacao'}
 

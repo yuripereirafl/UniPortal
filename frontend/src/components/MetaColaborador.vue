@@ -1,5 +1,6 @@
 <template>
   <div class="meta-colaborador">
+  <div v-if="error" class="erro-meta" style="color: red; margin: 16px 0; text-align: center;">{{ error }}</div>
     <!-- Modal de Ranking dos Vendedores -->
     <div v-if="mostrarRanking" class="ranking-modal-overlay">
       <div class="ranking-modal">
@@ -408,7 +409,8 @@ export default {
       colaboradorSelecionado: '',
       colaboradoresProcessados: [],
       dadosColaborador: {},
-      mostrarRanking: true // Modal de ranking aparece primeiro
+      mostrarRanking: true, // Modal de ranking aparece primeiro
+      error: null
     };
   },
   computed: {
@@ -471,15 +473,27 @@ export default {
     
     processarColaboradores(colaboradores) {
       // Processar dados dos colaboradores vindos do Dashboard
-      this.colaboradoresProcessados = colaboradores.map(colab => ({
-        id: colab.id,
-        nome: colab.nome,
-        sobrenome: colab.sobrenome,
-        cargo: colab.cargo,
-        setores: colab.setores,
-        // Determinar unidade baseado nos setores
-        unidade: this.getUnidadeFromSetores(colab.setores)
-      }));
+      this.colaboradoresProcessados = colaboradores.map(colab => {
+        let cargo = colab.cargo;
+        // Se o cargo vier como objeto, garanta que o campo nome está presente
+        if (cargo && typeof cargo === 'object') {
+          cargo = {
+            nome: cargo.nome || cargo.cargo_nome || cargo.funcao || '',
+            nivel: cargo.nivel || cargo.cargo_nivel || '',
+            equipe: cargo.equipe || cargo.cargo_equipe || '',
+            id: cargo.id || cargo.cargo_id || ''
+          };
+        }
+        return {
+          id: colab.id,
+          nome: colab.nome,
+          sobrenome: colab.sobrenome,
+          cpf: colab.cpf,
+          cargo: cargo,
+          setores: colab.setores,
+          unidade: this.getUnidadeFromSetores(colab.setores)
+        };
+      });
     },
 
     getUnidadeFromSetores(setores) {
@@ -501,33 +515,45 @@ export default {
     async carregarMetaColaborador() {
       if (!this.colaboradorSelecionado) {
         this.dadosColaborador = {};
+        this.error = null;
         return;
       }
-      
       try {
         this.carregando = true;
-        
-        // Buscar dados do colaborador selecionado
+        this.error = null;
         const colaborador = this.colaboradoresProcessados.find(c => c.id == this.colaboradorSelecionado);
-        
-        if (!colaborador) {
-          console.error('Colaborador não encontrado');
+        if (!colaborador || !colaborador.cpf) {
+          this.error = 'Colaborador não encontrado ou sem CPF.';
+          this.dadosColaborador = {};
           return;
         }
-        
-        // Simular API call - substituir pela API real
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Gerar dados simulados baseados no colaborador real
-        const dadosSimulados = this.gerarDadosSimulados(colaborador);
-        
+        // Usa variável de ambiente para o endereço base da API
+        const baseUrl = process.env.VUE_APP_API_BASE_URL || '';
+        const response = await fetch(`${baseUrl}/metas/colaborador/${colaborador.cpf}`);
+        if (!response.ok) {
+          this.error = 'Colaborador não encontrado ou sem meta cadastrada.';
+          this.dadosColaborador = {};
+          return;
+        }
+        const dadosApi = await response.json();
+        // Adapta os dados recebidos para o formato esperado pelo frontend
         this.dadosColaborador = {
           ...colaborador,
-          ...dadosSimulados
+          metaTotal: dadosApi.meta_total,
+          totalRealizado: dadosApi.soma_total_realizado,
+          percentualMeta: dadosApi.meta_total ? (dadosApi.soma_total_realizado / dadosApi.meta_total) * 100 : 0,
+          categorias: Array.isArray(dadosApi.realizados) ? dadosApi.realizados.map(item => ({
+            nome: item.tipo_grupo || '-',
+            meta: dadosApi.meta_total,
+            realizado: item.total_realizado,
+            icon: 'fas fa-chart-bar'
+          })) : [],
+          ultimos7Dias: 0, // Pode ser ajustado se o backend fornecer
+          mesAnterior: 0   // Pode ser ajustado se o backend fornecer
         };
-        
       } catch (error) {
-        console.error('Erro ao carregar meta do colaborador:', error);
+        this.error = 'Erro ao carregar meta do colaborador.';
+        this.dadosColaborador = {};
       } finally {
         this.carregando = false;
       }

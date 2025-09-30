@@ -114,7 +114,7 @@
           <div v-if="loadingStates.grupos" class="loading-overlay">
             <div class="mini-spinner"></div>
           </div>
-          <table>
+          <table style="min-width:1200px;">
       <thead>
         <tr>
           <th @click="toggleOrdenacaoNome" style="cursor:pointer">
@@ -181,7 +181,7 @@
             <span v-else>—</span>
           </td>
           <td :class="['clicavel', celulasExpandidas.has('cargo-' + func.id) ? 'expandida' : '']" @click="toggleCelula('cargo-' + func.id)">
-            {{ func.cargo || '—' }}
+            {{ func.cargo && typeof func.cargo === 'object' && func.cargo.nome ? func.cargo.nome : (func.cargo || '—') }}
           </td>
           <td :class="['clicavel', celulasExpandidas.has('sistemas-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sistemas-' + func.id)">
             <span v-if="func.sistemas && func.sistemas.length">
@@ -546,7 +546,13 @@ export default {
           }
           
           // Busca mais detalhada só se necessário
-          const cargo = (f.cargo || '').toLowerCase();
+          let cargoNome = '';
+          if (typeof f.cargo === 'string') {
+            cargoNome = f.cargo;
+          } else if (f.cargo && typeof f.cargo === 'object') {
+            cargoNome = f.cargo.nome || f.cargo.cargo_nome || f.cargo.funcao || '';
+          }
+          const cargo = cargoNome.toLowerCase();
           const celular = (f.celular || '').toLowerCase();
           
           return cargo.includes(busca) || celular.includes(busca);
@@ -1300,11 +1306,13 @@ export default {
 
 /* Container da tabela otimizado */
 .table-container {
-  overflow-x: auto;
+  overflow-x: auto !important;
   width: 100%;
+  max-width: 100vw;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
+  padding-bottom: 2px;
 }
 
 .table-container::-webkit-scrollbar {
@@ -2285,27 +2293,16 @@ tbody tr:last-child td {
 
 @media (max-width: 1200px) {
   table {
-    min-width: 1000px;
+    min-width: 900px;
   }
-  
   thead th, td {
-    padding: 12px 8px;
+    padding: 12px 6px;
     font-size: 13px;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  
-  thead th:nth-child(1), td:nth-child(1) { width: 80px; }
-  thead th:nth-child(2), td:nth-child(2) { width: 100px; }
-  thead th:nth-child(3), td:nth-child(3) { width: 85px; }
-  thead th:nth-child(4), td:nth-child(4) { width: 95px; }
-  thead th:nth-child(5), td:nth-child(5) { width: 80px; }
-  thead th:nth-child(6), td:nth-child(6) { width: 150px; }
-  thead th:nth-child(7), td:nth-child(7) { width: 90px; }
-  thead th:nth-child(8), td:nth-child(8) { width: 100px; }
-  thead th:nth-child(9), td:nth-child(9) { width: 70px; }
-  thead th:nth-child(10), td:nth-child(10) { width: 60px; }
-  thead th:nth-child(11), td:nth-child(11) { width: 60px; }
-  thead th:nth-child(12), td:nth-child(12) { width: 75px; }
-  thead th:nth-child(13), td:nth-child(13) { width: 65px; }
 }
 
 @media (max-width: 1000px) {
