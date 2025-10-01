@@ -192,10 +192,16 @@
                 <i class="fas fa-user"></i>
                 Colaborador
               </label>
-              <select v-model="colaboradorSelecionado" @change="carregarMetaColaborador" class="select-premium">
-                <option value="">Selecione um colaborador...</option>
+              <select 
+                v-model="colaboradorSelecionado" 
+                @change="carregarMetaColaborador" 
+                class="select-premium"
+                :disabled="carregandoColaboradores"
+              >
+                <option value="" v-if="carregandoColaboradores">Carregando colaboradores...</option>
+                <option value="" v-else>Selecione um colaborador...</option>
                 <option v-for="colaborador in colaboradoresProcessados" :key="colaborador.id" :value="colaborador.id">
-                  {{ colaborador.nome }} {{ colaborador.sobrenome }} - {{ colaborador.cargo?.nome || 'Sem cargo' }}
+                  {{ colaborador.nome }} - {{ colaborador.cargo }}
                 </option>
               </select>
             </div>
@@ -234,9 +240,9 @@
             {{ (dadosColaborador.nome || 'U').charAt(0).toUpperCase() }}
           </div>
           <div class="colaborador-dados">
-            <h2>{{ dadosColaborador.nome }} {{ dadosColaborador.sobrenome }}</h2>
-            <p class="cargo">{{ dadosColaborador.cargo?.nome || 'Cargo não definido' }}</p>
-            <span class="unidade-badge">{{ dadosColaborador.unidade }}</span>
+            <h2>{{ dadosColaborador.nome }}</h2>
+            <p class="cargo">{{ dadosColaborador.cargo || 'Cargo não definido' }}</p>
+            <span class="unidade-badge">{{ dadosColaborador.unidade || 'Sem unidade' }}</span>
           </div>
         </div>
         <div class="performance-resumo">
@@ -255,7 +261,7 @@
             </div>
             <span class="kpi-titulo">Meta Total</span>
           </div>
-          <div class="kpi-valor">{{ dadosColaborador.metaTotal || 0 }}</div>
+          <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.metaTotal || 0) }}</div>
           <div class="kpi-sublabel">Objetivo do mês</div>
         </div>
 
@@ -266,7 +272,7 @@
             </div>
             <span class="kpi-titulo">Realizado</span>
           </div>
-          <div class="kpi-valor">{{ dadosColaborador.totalRealizado || 0 }}</div>
+          <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.totalRealizado || 0) }}</div>
           <div class="kpi-sublabel">Até o momento</div>
         </div>
 
@@ -277,7 +283,7 @@
             </div>
             <span class="kpi-titulo">Faltante</span>
           </div>
-          <div class="kpi-valor">{{ (dadosColaborador.metaTotal || 0) - (dadosColaborador.totalRealizado || 0) }}</div>
+          <div class="kpi-valor">{{ formatarMoeda((dadosColaborador.metaTotal || 0) - (dadosColaborador.totalRealizado || 0)) }}</div>
           <div class="kpi-sublabel">Para atingir meta</div>
         </div>
 
@@ -395,6 +401,8 @@
 </template>
 
 <script>
+import { API_BASE_URL } from '@/api.js'
+
 export default {
   name: 'MetaColaborador',
   props: {
@@ -406,6 +414,7 @@ export default {
   data() {
     return {
       carregando: false,
+      carregandoColaboradores: false,
       colaboradorSelecionado: '',
       colaboradoresProcessados: [],
       dadosColaborador: {},
@@ -415,10 +424,33 @@ export default {
   },
   computed: {
     mediaDiaria() {
-      if (!this.dadosColaborador.metaTotal) return 0;
+      console.log('Calculando mediaDiaria...');
+      console.log('dadosColaborador.metaDiaria:', this.dadosColaborador.metaDiaria);
+      console.log('dadosColaborador.metaTotal:', this.dadosColaborador.metaTotal);
+      
+      // Usa a meta diária que vem da API, ou calcula se não houver
+      if (this.dadosColaborador.metaDiaria && this.dadosColaborador.metaDiaria > 0) {
+        const valorFormatado = this.formatarMoeda(this.dadosColaborador.metaDiaria);
+        console.log('Usando meta diária da API:', valorFormatado);
+        return valorFormatado;
+      }
+      
+      if (!this.dadosColaborador.metaTotal) {
+        console.log('Sem meta total, retornando 0');
+        return this.formatarMoeda(0);
+      }
+      
       const diasRestantes = 30 - new Date().getDate();
       const faltante = (this.dadosColaborador.metaTotal || 0) - (this.dadosColaborador.totalRealizado || 0);
-      return diasRestantes > 0 ? Math.ceil(faltante / diasRestantes) : 0;
+      const valorCalculado = diasRestantes > 0 ? Math.ceil(faltante / diasRestantes) : 0;
+      
+      console.log('Calculando meta diária:', {
+        diasRestantes,
+        faltante,
+        valorCalculado
+      });
+      
+      return this.formatarMoeda(valorCalculado);
     },
     
     melhorCategoria() {
@@ -464,36 +496,122 @@ export default {
     }
   },
   mounted() {
-    this.processarColaboradores(this.colaboradores);
+    // Carrega colaboradores com metas diretamente da API ao invés de depender das props
+    this.carregarColaboradoresComMetas();
   },
   methods: {
+    async carregarColaboradoresComMetas() {
+      this.carregandoColaboradores = true;
+      try {
+        // Primeiro, tenta buscar colaboradores que têm metas cadastradas
+        const response = await fetch(`${API_BASE_URL}/metas/colaboradores-com-metas`);
+        
+        if (response.ok) {
+          const colaboradores = await response.json();
+          console.log('Colaboradores com metas carregados da API:', colaboradores);
+          this.processarColaboradores(colaboradores);
+        } else {
+          console.log('API de colaboradores-com-metas não disponível, usando filtro local');
+          // Fallback: filtrar colaboradores das props que têm metas
+          await this.filtrarColaboradoresComMetas();
+        }
+      } catch (error) {
+        console.error('Erro ao carregar colaboradores com metas:', error);
+        // Fallback: filtrar colaboradores das props que têm metas
+        await this.filtrarColaboradoresComMetas();
+      } finally {
+        this.carregandoColaboradores = false;
+      }
+    },
+
+    async filtrarColaboradoresComMetas() {
+      // Método fallback que verifica quais colaboradores das props têm metas
+      const colaboradoresComMetas = [];
+      
+      for (const colaborador of this.colaboradores) {
+        try {
+          // Verifica se o colaborador tem meta cadastrada
+          const responseVerificacao = await fetch(`${API_BASE_URL}/metas/colaborador/${colaborador.cpf || colaborador.id}`);
+          
+          if (responseVerificacao.ok) {
+            const metas = await responseVerificacao.json();
+            if (metas && metas.length > 0) {
+              // Adiciona dados da meta ao colaborador
+              const metaAtual = metas[0];
+              colaboradoresComMetas.push({
+                ...colaborador,
+                meta_total: metaAtual.meta_final,
+                meta_diaria: metaAtual.meta_diaria,
+                id_eyal: metaAtual.id_eyal,
+                cargo: metaAtual.cargo || colaborador.cargo
+              });
+            }
+          }
+        } catch (error) {
+          console.log(`Erro ao verificar meta para colaborador ${colaborador.nome}:`, error);
+        }
+      }
+      
+      console.log('Colaboradores filtrados com metas:', colaboradoresComMetas);
+      this.processarColaboradores(colaboradoresComMetas);
+    },
+
     fecharRanking() {
       this.mostrarRanking = false;
     },
     
     processarColaboradores(colaboradores) {
-      // Processar dados dos colaboradores vindos do Dashboard
+      console.log('Processando colaboradores:', colaboradores);
+      
+      if (!colaboradores || colaboradores.length === 0) {
+        this.colaboradoresProcessados = [];
+        return;
+      }
+
+      // Processar dados dos colaboradores
       this.colaboradoresProcessados = colaboradores.map(colab => {
-        let cargo = colab.cargo;
-        // Se o cargo vier como objeto, garanta que o campo nome está presente
-        if (cargo && typeof cargo === 'object') {
-          cargo = {
-            nome: cargo.nome || cargo.cargo_nome || cargo.funcao || '',
-            nivel: cargo.nivel || cargo.cargo_nivel || '',
-            equipe: cargo.equipe || cargo.cargo_equipe || '',
-            id: cargo.id || cargo.cargo_id || ''
-          };
+        console.log('Processando colaborador:', colab);
+        
+        // Extrair informações do cargo
+        let cargoInfo = 'Cargo não definido';
+        if (colab.cargo) {
+          if (typeof colab.cargo === 'string') {
+            cargoInfo = colab.cargo;
+          } else if (typeof colab.cargo === 'object') {
+            cargoInfo = colab.cargo.nome || colab.cargo.cargo_nome || colab.cargo.funcao || 'Cargo não definido';
+          }
         }
+        
+        // Se não tem cargo, tenta usar a função
+        if (cargoInfo === 'Cargo não definido' && colab.funcao) {
+          cargoInfo = colab.funcao;
+        }
+
+        // Extrair nome completo
+        let nomeCompleto = '';
+        if (colab.nome && colab.sobrenome) {
+          nomeCompleto = `${colab.nome} ${colab.sobrenome}`;
+        } else if (colab.nome) {
+          nomeCompleto = colab.nome;
+        } else {
+          nomeCompleto = 'Nome não definido';
+        }
+
         return {
-          id: colab.id,
-          nome: colab.nome,
-          sobrenome: colab.sobrenome,
+          id: colab.id || colab.id_funcionario,
+          nome: nomeCompleto,
           cpf: colab.cpf,
-          cargo: cargo,
-          setores: colab.setores,
-          unidade: this.getUnidadeFromSetores(colab.setores)
+          cargo: cargoInfo,
+          setores: colab.setores || [],
+          unidade: colab.unidade || this.getUnidadeFromSetores(colab.setores || []) || 'Sem unidade',
+          // Campos adicionais que podem vir da API de metas
+          meta_total: colab.meta_final || colab.meta_total || 0,
+          meta_diaria: colab.meta_diaria || 0,
+          id_eyal: colab.id_eyal
         };
       });
+
+      console.log('Colaboradores processados:', this.colaboradoresProcessados);
     },
 
     getUnidadeFromSetores(setores) {
@@ -521,41 +639,153 @@ export default {
       try {
         this.carregando = true;
         this.error = null;
+        
         const colaborador = this.colaboradoresProcessados.find(c => c.id == this.colaboradorSelecionado);
-        if (!colaborador || !colaborador.cpf) {
-          this.error = 'Colaborador não encontrado ou sem CPF.';
+        if (!colaborador) {
+          this.error = 'Colaborador não encontrado.';
           this.dadosColaborador = {};
           return;
         }
-        // Usa variável de ambiente para o endereço base da API
-        const baseUrl = process.env.VUE_APP_API_BASE_URL || '';
-        const response = await fetch(`${baseUrl}/metas/colaborador/${colaborador.cpf}`);
+
+        console.log('Colaborador selecionado:', colaborador);
+
+        // Se já temos dados de meta do colaborador (vindos da nova API), usa eles
+        if (colaborador.meta_total && colaborador.id_eyal) {
+          console.log('Usando dados de meta já carregados:', colaborador);
+          
+          this.dadosColaborador = {
+            ...colaborador,
+            nome: colaborador.nome,
+            sobrenome: '', // Limpa sobrenome para evitar duplicação
+            unidade: colaborador.unidade || 'Sem unidade',
+            equipe: colaborador.equipe || '',
+            cargo: colaborador.cargo || colaborador.funcao || 'Cargo não definido',
+            nivel: colaborador.nivel || '',
+            lider_direto: colaborador.lider_direto || '',
+            metaTotal: colaborador.meta_total || 0,
+            metaDiaria: colaborador.meta_diaria || 0,
+            diasTrabalhados: colaborador.dias_trabalhados || 0,
+            diasFalta: colaborador.dias_de_falta || 0,
+            totalRealizado: 0, // Será preenchido quando tivermos dados de realizado
+            percentualMeta: 0, // Será calculado quando tivermos dados de realizado
+            categorias: [], // Será preenchido quando tivermos dados de realizado
+            ultimos7Dias: 0,
+            mesAnterior: 0,
+            mesRef: colaborador.mes_ref || new Date().toISOString().slice(0, 7),
+            id_eyal: colaborador.id_eyal
+          };
+          
+          console.log('Dados do colaborador montados:', this.dadosColaborador);
+          
+          // Busca os dados de realizado
+          if (colaborador.id_eyal) {
+            await this.carregarDadosRealizado(colaborador.id_eyal);
+          }
+          
+          return;
+        }
+
+        // Fallback: busca dados da API tradicional se não temos dados completos
+        if (!colaborador.cpf) {
+          this.error = 'Colaborador sem CPF cadastrado.';
+          this.dadosColaborador = {};
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/metas/colaborador/${colaborador.cpf}`);
         if (!response.ok) {
+          if (response.status === 404) {
+            console.log(`Info: Funcionário ${colaborador.nome} (CPF: ${colaborador.cpf}) não possui metas cadastradas`);
+          }
           this.error = 'Colaborador não encontrado ou sem meta cadastrada.';
           this.dadosColaborador = {};
           return;
         }
+        
         const dadosApi = await response.json();
+        console.log('Dados recebidos da API de metas (fallback):', dadosApi);
+        
+        // A API retorna um array de metas, vamos pegar a primeira (mais recente)
+        const metaAtual = Array.isArray(dadosApi) && dadosApi.length > 0 ? dadosApi[0] : null;
+        console.log('Meta atual selecionada:', metaAtual);
+        console.log('Meta diária recebida:', metaAtual?.meta_diaria);
+        
+        if (!metaAtual) {
+          this.error = 'Nenhuma meta encontrada para este colaborador.';
+          this.dadosColaborador = {};
+          return;
+        }
+        
         // Adapta os dados recebidos para o formato esperado pelo frontend
         this.dadosColaborador = {
           ...colaborador,
-          metaTotal: dadosApi.meta_total,
-          totalRealizado: dadosApi.soma_total_realizado,
-          percentualMeta: dadosApi.meta_total ? (dadosApi.soma_total_realizado / dadosApi.meta_total) * 100 : 0,
-          categorias: Array.isArray(dadosApi.realizados) ? dadosApi.realizados.map(item => ({
-            nome: item.tipo_grupo || '-',
-            meta: dadosApi.meta_total,
-            realizado: item.total_realizado,
-            icon: 'fas fa-chart-bar'
-          })) : [],
-          ultimos7Dias: 0, // Pode ser ajustado se o backend fornecer
-          mesAnterior: 0   // Pode ser ajustado se o backend fornecer
+          nome: metaAtual.nome || colaborador.nome,
+          sobrenome: '', // Limpa sobrenome para evitar duplicação 
+          unidade: metaAtual.unidade || colaborador.unidade || 'Sem unidade',
+          equipe: metaAtual.equipe || '',
+          cargo: metaAtual.cargo || metaAtual.funcao || colaborador.cargo || 'Cargo não definido',
+          nivel: metaAtual.nivel || '',
+          lider_direto: metaAtual.lider_direto || '',
+          metaTotal: metaAtual.meta_final || 0,
+          metaDiaria: metaAtual.meta_diaria || 0,
+          diasTrabalhados: metaAtual.dias_trabalhados || 0,
+          diasFalta: metaAtual.dias_de_falta || 0,
+          totalRealizado: 0, // Será preenchido quando tivermos dados de realizado
+          percentualMeta: 0, // Será calculado quando tivermos dados de realizado
+          categorias: [], // Será preenchido quando tivermos dados de realizado
+          ultimos7Dias: 0,
+          mesAnterior: 0,
+          mesRef: metaAtual.mes_ref,
+          id_eyal: metaAtual.id_eyal
         };
+        
+        console.log('Dados do colaborador montados:', this.dadosColaborador);
+        
+        // Agora busca os dados de realizado se tiver id_eyal
+        if (metaAtual.id_eyal) {
+          await this.carregarDadosRealizado(metaAtual.id_eyal);
+        }
       } catch (error) {
         this.error = 'Erro ao carregar meta do colaborador.';
         this.dadosColaborador = {};
       } finally {
         this.carregando = false;
+      }
+    },
+    
+    async carregarDadosRealizado(idEyal) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/realizado/colaborador/${idEyal}/resumo`);
+        
+        if (response.ok) {
+          const dadosRealizado = await response.json();
+          console.log('Dados de realizado:', dadosRealizado);
+          
+          // Calcula o total realizado (remove o TOTAL_GERAL do cálculo)
+          const totalRealizado = dadosRealizado.TOTAL_GERAL || 0;
+          
+          // Atualiza os dados do colaborador
+          this.dadosColaborador.totalRealizado = totalRealizado;
+          this.dadosColaborador.percentualMeta = this.dadosColaborador.metaTotal > 0 
+            ? (totalRealizado / this.dadosColaborador.metaTotal) * 100 
+            : 0;
+          
+          // Cria categorias baseadas nos dados de realizado
+          this.dadosColaborador.categorias = Object.entries(dadosRealizado)
+            .filter(([key]) => key !== 'TOTAL_GERAL')
+            .map(([tipo, realizado]) => ({
+              nome: tipo || 'Outros',
+              meta: Math.round(this.dadosColaborador.metaTotal * 0.25), // Distribui meta proporcionalmente
+              realizado: realizado,
+              icon: 'fas fa-chart-bar'
+            }));
+        } else {
+          console.log(`Info: Funcionário ID Eyal ${idEyal} não possui dados de realizado`);
+          // Mantém os valores zerados que já foram definidos
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados de realizado:', error);
+        // Mantém os valores zerados que já foram definidos
       }
     },
     
@@ -628,6 +858,14 @@ export default {
       if (percentual >= 100) return 'Meta Atingida';
       if (percentual >= 80) return 'Quase Lá';
       return 'Em Andamento';
+    },
+    
+    formatarMoeda(valor) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: 2
+      }).format(valor || 0);
     }
   }
 };

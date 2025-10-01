@@ -312,6 +312,10 @@
               <input v-model="form.cpf" placeholder="CPF" />
             </div>
             <div>
+              <label>ID Eyal</label>
+              <input v-model="form.id_eyal" placeholder="ID Eyal" />
+            </div>
+            <div>
               <label>Data de Admissão</label>
               <input type="date" v-model="form.data_admissao" />
             </div>
@@ -493,6 +497,7 @@ export default {
         celular: '',
         email: '',
         cpf: '',
+        id_eyal: '',
         tipo_contrato: '',
         data_afastamento: '',
         data_retorno: '',
@@ -837,6 +842,7 @@ export default {
         celular: this.form.celular,
         email: this.form.email || '',
         cpf: this.form.cpf,
+        id_eyal: this.form.id_eyal,
         tipo_contrato: this.form.tipo_contrato,
         grupos_email_ids: [...this.form.grupos_email_ids],
         setores_ids: [...this.form.setores_ids],
@@ -860,6 +866,7 @@ export default {
         celular: '',
         email: '',
         cpf: '',
+        id_eyal: '',
         tipo_contrato: '',
         data_afastamento: '',
         data_retorno: '',
@@ -903,6 +910,7 @@ export default {
         data_admissao: func.data_admissao || '',
         data_inativado: dataInativado || '',
         cpf: func.cpf || '',
+        id_eyal: func.id_eyal || '',
         tipo_contrato: func.tipo_contrato || '',
         data_afastamento: func.data_afastamento || '',
         data_retorno: func.data_retorno || ''
@@ -957,6 +965,7 @@ export default {
         celular: this.form.celular,
         email: this.form.email || '',
         cpf: this.form.cpf,
+        id_eyal: this.form.id_eyal,
         tipo_contrato: this.form.tipo_contrato,
         data_afastamento: this.form.data_afastamento,
         data_retorno: this.form.data_retorno,

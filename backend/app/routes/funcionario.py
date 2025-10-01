@@ -54,7 +54,9 @@ def adicionar_funcionario(funcionario: FuncionarioCreate):
         data_afastamento=converter_string_para_date(funcionario.data_afastamento),
         tipo_contrato=funcionario.tipo_contrato,
         data_retorno=converter_string_para_date(funcionario.data_retorno),
-        data_inativado=funcionario.data_inativado if funcionario.data_inativado not in ('', None) else None
+        data_inativado=funcionario.data_inativado if funcionario.data_inativado not in ('', None) else None,
+        lider_direto_id=funcionario.lider_direto_id,
+        id_eyal=funcionario.id_eyal
     )
     db.add(novo_funcionario)
     db.commit()
@@ -169,7 +171,9 @@ def adicionar_funcionario(funcionario: FuncionarioCreate):
         'cpf': novo_funcionario.cpf,
         'data_afastamento': str(novo_funcionario.data_afastamento) if novo_funcionario.data_afastamento else None,
         'tipo_contrato': novo_funcionario.tipo_contrato,
-        'data_retorno': str(novo_funcionario.data_retorno) if novo_funcionario.data_retorno else None
+        'data_retorno': str(novo_funcionario.data_retorno) if novo_funcionario.data_retorno else None,
+        'lider_direto_id': novo_funcionario.lider_direto_id,
+        'id_eyal': novo_funcionario.id_eyal
     })
     db.close()
     return funcionario_schema
@@ -204,6 +208,8 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
         db_funcionario.email = funcionario.email
     if funcionario.cpf is not None and funcionario.cpf != '':
         db_funcionario.cpf = funcionario.cpf
+    if funcionario.id_eyal is not None:
+        db_funcionario.id_eyal = funcionario.id_eyal
     if funcionario.tipo_contrato is not None and funcionario.tipo_contrato != '':
         db_funcionario.tipo_contrato = funcionario.tipo_contrato
     
@@ -281,6 +287,14 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
     
     if hasattr(funcionario, 'data_inativado') and funcionario.data_inativado not in ('', None):
         db_funcionario.data_inativado = str(funcionario.data_inativado)
+    
+    # Atualiza líder direto
+    if hasattr(funcionario, 'lider_direto_id'):
+        db_funcionario.lider_direto_id = funcionario.lider_direto_id
+    
+    # Atualiza id_eyal
+    if hasattr(funcionario, 'id_eyal'):
+        db_funcionario.id_eyal = funcionario.id_eyal
     
     # Atualiza relacionamentos apenas se fornecidos
     # Só atualiza relacionamentos se foram explicitamente fornecidos
@@ -384,7 +398,9 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
         'cpf': db_funcionario.cpf,
         'data_afastamento': str(db_funcionario.data_afastamento) if db_funcionario.data_afastamento else None,
         'tipo_contrato': db_funcionario.tipo_contrato,
-        'data_retorno': str(db_funcionario.data_retorno) if db_funcionario.data_retorno else None
+        'data_retorno': str(db_funcionario.data_retorno) if db_funcionario.data_retorno else None,
+        'lider_direto_id': db_funcionario.lider_direto_id,
+        'id_eyal': db_funcionario.id_eyal
     })
     db.close()
     return funcionario_schema
@@ -427,7 +443,9 @@ def list_funcionarios():
             'data_afastamento': funcionario.data_afastamento.strftime('%Y-%m-%d') if funcionario.data_afastamento else None,
             'tipo_contrato': funcionario.tipo_contrato,
             'data_retorno': funcionario.data_retorno.strftime('%Y-%m-%d') if funcionario.data_retorno else None,
-            'motivo_afastamento': funcionario.motivo_afastamento
+            'motivo_afastamento': funcionario.motivo_afastamento,
+            'lider_direto_id': funcionario.lider_direto_id,
+            'id_eyal': funcionario.id_eyal
         })
         resultado.append(funcionario_schema)
     db.close()

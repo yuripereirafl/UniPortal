@@ -28,6 +28,8 @@ class FuncionarioBase(BaseModel):
     motivo_afastamento: Optional[str] = None
     meta: Optional[Union[float, str]] = None  
     tipo_pgto: Optional[str] = None
+    lider_direto_id: Optional[int] = None
+    id_eyal: Optional[str] = None
 
 class FuncionarioCreate(FuncionarioBase):
     pass
@@ -57,6 +59,8 @@ class FuncionarioUpdate(BaseModel):
     motivo_afastamento: Optional[str] = None
     meta: Optional[Union[float, str]] = None
     tipo_pgto: Optional[str] = None
+    lider_direto_id: Optional[int] = None
+    id_eyal: Optional[str] = None
 
 class Funcionario(FuncionarioBase):
     id: int

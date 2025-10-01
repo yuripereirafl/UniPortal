@@ -135,6 +135,10 @@
               <label><i class="fas fa-id-card"></i> CPF</label>
               <input v-model="colaboradorEditando.cpf" type="text" disabled placeholder="(não editável)" />
             </div>
+            <!--<div class="form-group">
+              <label><i class="fas fa-hashtag"></i> ID Eyal</label>
+              <input v-model="colaboradorEditando.id_eyal" type="text" placeholder="ID Eyal" />
+            </div>-->
             <div class="form-group">
               <label><i class="fas fa-briefcase"></i> Nome do Cargo</label>
               <div class="select-wrapper">
@@ -172,6 +176,19 @@
               </div>
             </div>
             <div class="form-group">
+              <label for="liderDireto" class="form-label">
+                <i class="fas fa-user-tie"></i> LÍDER DIRETO
+              </label>
+              <div class="select-wrapper">
+                <select id="liderDireto" v-model="colaboradorEditando.lider_direto_id" class="form-select">
+                  <option :value="null">Nenhum líder direto</option>
+                  <option v-for="lider in listaDeLideres" :key="lider.id" :value="lider.id">
+                    {{ lider.nome }} {{ lider.sobrenome }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
               <label><i class="fas fa-building"></i> Unidade</label>
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.setor_id">
@@ -179,14 +196,14 @@
                 </select>
               </div>
             </div>
-            <div class="form-group">
+            <!-- <div class="form-group">
               <label><i class="fas fa-money-bill-wave"></i> Tipo de Pagamento</label>
               <div class="select-wrapper">
                 <select v-model="colaboradorEditando.tipo_pgto" class="custom-select-tipo-pgto">
                   <option v-for="opcao in opcoesTipoPgto" :key="opcao" :value="opcao">{{ opcao }}</option>
                 </select>
               </div>
-            </div>
+            </div> -->
             <div v-if="colaboradorEditando.tipo_pgto" class="form-group">
               <label><i class="fas fa-bullseye"></i> Meta</label>
               <div class="select-wrapper">
@@ -295,12 +312,15 @@ export default {
         data_afastamento: '',
         data_retorno: '',
         motivo_afastamento: '',
-        motivo_outros: ''
+        motivo_outros: '',
+        lider_direto_id: null,
+        id_eyal: ''
       },
       salvando: false,
       // Listas para os selects
       cargos: [],
       setores: [],
+      listaDeLideres: [],
       // Opções separadas do cargo para os selects
       opcoesCargoSeparadas: {
         nomes: [],
@@ -336,6 +356,7 @@ export default {
     this.carregarCargos();
     this.carregarSetores();
     this.carregarOpcoesCargoSeparadas();
+    // this.carregarListaDeLideres(); // Carregará apenas quando necessário
   },
   computed: {
     // Usa colaboradores da prop se disponível, senão usa dados internos
@@ -393,13 +414,17 @@ export default {
       }
       this.carregando = false;
     },
-    editarColaborador(colaborador) {
+    async editarColaborador(colaborador) {
       console.log('Editando colaborador:', colaborador);
       console.log('Setores disponíveis:', this.setores);
       console.log('Setores do colaborador:', colaborador.setores);
       console.log('Data afastamento original:', colaborador.data_afastamento);
       console.log('Data retorno original:', colaborador.data_retorno);
       console.log('Motivo afastamento original:', colaborador.motivo_afastamento);
+      console.log('Líder direto ID do colaborador:', colaborador.lider_direto);
+      
+      // Carrega a lista de líderes ANTES de abrir o modal
+      await this.carregarListaDeLideres();
       
       // Preenche setor_id - agora os setores vêm como objetos {id, nome}
       let setorId = '';
@@ -430,6 +455,7 @@ export default {
         data_admissao: colaborador.data_admissao || '',
         data_inativado: colaborador.data_inativado || '',
         cpf: colaborador.cpf ? colaborador.cpf : '',
+        id_eyal: colaborador.id_eyal || '',
         data_afastamento: colaborador.data_afastamento || '',
         tipo_contrato: colaborador.tipo_contrato || '',
         data_retorno: colaborador.data_retorno || '',
@@ -440,9 +466,13 @@ export default {
         motivo_outros: colaborador.motivo_afastamento && colaborador.motivo_afastamento.startsWith('Outros:')
           ? colaborador.motivo_afastamento.replace('Outros:', '').trim()
           : '',
+        lider_direto_id: colaborador.lider_direto_id || null,
         meta: colaborador.meta?.calc_meta ?? '',
         tipo_pgto: colaborador.meta?.tipo_pgto ?? ''
       };
+      
+      console.log('Colaborador editando preenchido:', this.colaboradorEditando);
+      console.log('Líder direto ID atribuído:', this.colaboradorEditando.lider_direto_id);
       
       console.log('Objeto colaboradorEditando criado:', this.colaboradorEditando);
       console.log('Data afastamento formatada:', this.colaboradorEditando.data_afastamento);
@@ -466,7 +496,9 @@ export default {
         cargo_equipe: '',
         cargo_nivel: '',
         setor_id: '',
-        setores_ids: []
+        setores_ids: [],
+        lider_direto_id: null,
+        id_eyal: ''
       };
     },
     
@@ -536,6 +568,7 @@ export default {
           celular: this.colaboradorEditando.celular || '',
           email: this.colaboradorEditando.email || '',
           cpf: this.colaboradorEditando.cpf || '',
+          id_eyal: this.colaboradorEditando.id_eyal || '',
           data_admissao: this.colaboradorEditando.data_admissao || '',
           data_inativado: this.colaboradorEditando.data_inativado || '',
           data_afastamento: this.colaboradorEditando.data_afastamento || '',
@@ -545,6 +578,7 @@ export default {
           motivo_afastamento: this.colaboradorEditando.motivo_afastamento === 'Outros' 
             ? `Outros: ${this.colaboradorEditando.motivo_outros || ''}`.trim()
             : this.colaboradorEditando.motivo_afastamento || '',
+          lider_direto_id: this.colaboradorEditando.lider_direto_id || null,
           // Garantir que meta seja enviada como número (float) e tipo_pgto como string
           meta: this.colaboradorEditando.meta ? parseFloat(this.colaboradorEditando.meta) : null,
           tipo_pgto: this.colaboradorEditando.tipo_pgto || null
@@ -554,6 +588,8 @@ export default {
         console.log('Dados do colaborador sendo editado:', this.colaboradorEditando);
         console.log('=== PAYLOAD DEBUG ===');
         console.log('Payload completo enviado no PUT:', JSON.stringify(payload, null, 2));
+        console.log('ID Eyal no payload:', payload.id_eyal);
+        console.log('ID Eyal no colaboradorEditando:', this.colaboradorEditando.id_eyal);
         console.log('Tipo da meta:', typeof payload.meta, 'Valor:', payload.meta);
         console.log('Tipo do tipo_pgto:', typeof payload.tipo_pgto, 'Valor:', payload.tipo_pgto);
         console.log('setores_ids:', payload.setores_ids);
@@ -634,6 +670,49 @@ export default {
         console.log('Opções de cargo carregadas:', this.opcoesCargoSeparadas);
       } catch (e) {
         console.error('Erro ao carregar opções de cargo:', e);
+      }
+    },
+
+    async carregarListaDeLideres() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/funcionarios/`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const funcionarios = await response.json();
+        
+        // Lista de funções que podem ser líderes diretos
+        const funcoesLideranca = [
+          'gerente',
+          'supervisor',
+          'supervisor de atendimento', 
+          'monitor',
+          'orientador',
+          'coordenador'
+        ];
+        
+        // Filtra apenas funcionários ativos com funções de liderança
+        this.listaDeLideres = funcionarios.filter(func => {
+          // Verifica se está ativo (não inativado e não afastado)
+          const estaAtivo = !func.data_inativado && !func.data_afastamento;
+          
+          // Verifica se tem função de liderança
+          let temFuncaoLideranca = false;
+          if (func.cargo && func.cargo.funcao) {
+            const cargoFuncao = func.cargo.funcao.toLowerCase().trim();
+            temFuncaoLideranca = funcoesLideranca.some(funcao => 
+              cargoFuncao.includes(funcao.toLowerCase())
+            );
+          }
+          
+          return estaAtivo && temFuncaoLideranca;
+        });
+        
+        console.log('Lista de líderes carregada:', this.listaDeLideres.length, 'funcionários com funções de liderança');
+        console.log('Líderes encontrados:', this.listaDeLideres.map(l => `${l.nome} ${l.sobrenome} - ${l.cargo?.funcao || 'Sem função'}`));
+      } catch (e) {
+        console.error('Erro ao carregar lista de líderes:', e);
+        this.listaDeLideres = [];
       }
     },
     ordenarPor(coluna) {
@@ -1234,7 +1313,25 @@ export default {
   letter-spacing: 0.5px;
 }
 
+.form-label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .form-group label i {
+  color: #3b82f6;
+  font-size: 14px;
+}
+
+.form-label i {
   color: #3b82f6;
   font-size: 14px;
 }
@@ -1250,6 +1347,22 @@ export default {
   transition: all 0.3s ease;
   background: white;
   font-weight: 500;
+  appearance: none;
+  cursor: pointer;
+}
+
+.form-select {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  background: white;
+  font-weight: 500;
+  appearance: none;
+  cursor: pointer;
 }
 
 .form-group textarea {
@@ -1269,7 +1382,8 @@ export default {
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-select:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
