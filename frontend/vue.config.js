@@ -1,5 +1,6 @@
 // Usar variável de ambiente ou fallback para desenvolvimento
-const API_TARGET = process.env.VUE_APP_API_URL || 'http://localhost:8000';
+// Usa variável de ambiente para apontar para a API; por padrão aponta para a VM 192.168.1.37
+const API_TARGET = process.env.VUE_APP_API_URL || 'http://192.168.1.37:8000';
 
 module.exports = {
   devServer: {
