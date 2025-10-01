@@ -14,6 +14,7 @@
       <!-- Menu de Navegação -->
       <nav class="menu">
         <button 
+          v-if="$auth && $auth.hasPermission('adm')"
           class="menu-item" 
           :class="{active: activePanel==='dashboard'}" 
           @click="activePanel='dashboard'"
@@ -22,90 +23,100 @@
           <span class="menu-text">Dashboard</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='funcionarios'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('editar_colaborador') || $auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='funcionarios'}"
           @click="activePanel='funcionarios'"
         >
           <i class="fas fa-users menu-icon"></i>
           <span class="menu-text">Funcionários</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='sistemas'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='sistemas'}"
           @click="activePanel='sistemas'"
         >
           <i class="fas fa-server menu-icon"></i>
           <span class="menu-text">Sistemas</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='setores'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='setores'}"
           @click="activePanel='setores'"
         >
           <i class="fas fa-building menu-icon"></i>
           <span class="menu-text">Setores</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='cargos'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='cargos'}"
           @click="activePanel='cargos'"
         >
           <i class="fas fa-briefcase menu-icon"></i>
           <span class="menu-text">Cargos</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='quadroColaboradores'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('quadro_geral') || $auth.hasPermission('visualizar_quadro') || $auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='quadroColaboradores'}"
           @click="activePanel='quadroColaboradores'"
         >
           <i class="fas fa-users-cog menu-icon"></i>
           <span class="menu-text">Quadro de Colaboradores</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='metaColaborador'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('meta_colaborador') || $auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='metaColaborador'}"
           @click="activePanel='metaColaborador'"
         >
           <i class="fas fa-bullseye menu-icon"></i>
           <span class="menu-text">Meta Colaborador</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel==='gruposPasta'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='gruposPasta'}"
           @click="activePanel='gruposPasta'"
         >
           <i class="fas fa-folder-open menu-icon"></i>
           <span class="menu-text">Grupo de Pastas</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel === 'gruposEmail'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('ADM'))"
+          class="menu-item"
+          :class="{active: activePanel === 'gruposEmail'}"
           @click="activePanel = 'gruposEmail'"
         >
           <i class="fas fa-envelope menu-icon"></i>
           <span class="menu-text">Grupo de E-mail</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel === 'gruposWhatsapp'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('ADM'))"
+          class="menu-item"
+          :class="{active: activePanel === 'gruposWhatsapp'}"
           @click="activePanel = 'gruposWhatsapp'"
         >
           <i class="fab fa-whatsapp menu-icon"></i>
           <span class="menu-text">Grupo de WhatsApp</span>
         </button>
         
-        <button 
-          class="menu-item" 
-          :class="{active: activePanel === 'usuarios'}" 
+        <button
+          v-if="$auth && ($auth.hasPermission('adm') || $auth.hasPermission('editar_usuario'))"
+          class="menu-item"
+          :class="{active: activePanel === 'usuarios'}"
           @click="activePanel = 'usuarios'"
         >
           <i class="fas fa-user-shield menu-icon"></i>
@@ -157,7 +168,8 @@ export default {
   components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, QuadroColaboradores, MetaColaborador },
   data() {
     return {
-      activePanel: 'dashboard',
+      // não definir por padrão 'dashboard' — vamos escolher no mounted() com base nas permissões
+      activePanel: null,
       funcionarios: [],
       isCollapsed: false,
       isMobile: false
@@ -182,14 +194,53 @@ export default {
     }
   },
   mounted() {
+    // definir painel inicial com base nas permissões do usuário
+    this.selectInitialPanel();
+
+    // reagir a mudanças de auth (ex: admin atualiza permissões e faz reload do current user)
+    const onAuthUpdated = () => this.selectInitialPanel();
+    window.addEventListener('auth:updated', onAuthUpdated);
+    this._onAuthUpdated = onAuthUpdated;
+
     this.carregarFuncionarios();
     this.checkScreenSize();
     window.addEventListener('resize', this.checkScreenSize);
   },
+
   beforeUnmount() {
     window.removeEventListener('resize', this.checkScreenSize);
+    if (this._onAuthUpdated) window.removeEventListener('auth:updated', this._onAuthUpdated);
   },
   methods: {
+    selectInitialPanel() {
+      try {
+        const auth = this.$auth;
+        if (auth && typeof auth.hasPermission === 'function') {
+          if (auth.hasPermission('adm')) {
+            this.activePanel = 'dashboard';
+            return;
+          }
+          if (auth.hasPermission('meta_colaborador')) {
+            this.activePanel = 'metaColaborador';
+            return;
+          }
+          if (auth.hasPermission('adm') || auth.hasPermission('editar_usuario')) {
+            this.activePanel = 'usuarios';
+            return;
+          }
+          // garantir que não abrimos funcionários sem permissão específica
+          if (auth.hasPermission('editar_colaborador') || auth.hasPermission('adm')) {
+            this.activePanel = 'funcionarios';
+            return;
+          }
+        }
+        // Se nenhum dos casos acima, evitar abrir o painel 'dashboard' por padrão
+        // escolhemos 'metaColaborador' como fallback visual mais seguro
+        this.activePanel = 'metaColaborador';
+      } catch (e) {
+        this.activePanel = 'metaColaborador';
+      }
+    },
     async carregarFuncionarios() {
       try {
         console.log('Carregando funcionários de:', `${API_BASE_URL}/funcionarios/`);

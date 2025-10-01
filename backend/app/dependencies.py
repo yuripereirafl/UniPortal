@@ -44,10 +44,43 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         )
 
 def has_permission(user: User, permission_code: str, db: Session) -> bool:
+    def normalize_code(s: str):
+        if s is None:
+            return ''
+        return ''.join(ch for ch in str(s).strip().lower().replace(' ', '_') if (ch.isalnum() or ch == '_'))
+
+    target = normalize_code(permission_code)
+
+    # Permissões diretas do usuário
+    from app.models.usuarios_permissoes import usuarios_permissoes
+    direct = db.query(Permissao).join(usuarios_permissoes).filter(usuarios_permissoes.c.usuario_id == user.id).all()
+    for p in direct:
+        if normalize_code(p.codigo or p.descricao) == target:
+            return True
+
+    # Permissões via grupos
     grupos = db.query(Grupo).join(usuario_grupo).filter(usuario_grupo.c.usuario_id == user.id).all()
     for grupo in grupos:
-        # Join usando o relacionamento ORM, não a lista de objetos
-        permissoes = db.query(Permissao).join(Permissao.grupos).filter(Grupo.id == grupo.id, Permissao.codigo == permission_code).all()
-        if permissoes:
-            return True
+        permissoes = db.query(Permissao).join(Permissao.grupos).filter(Grupo.id == grupo.id).all()
+        for p in permissoes:
+            if normalize_code(p.codigo or p.descricao) == target:
+                return True
+
     return False
+
+
+def permission_required(permission_code: str):
+    """Factory que retorna uma dependência FastAPI para exigir uma permissão.
+
+    Uso em rotas:
+      @router.get('/algo', dependencies=[Depends(permission_required('Meta Colaborador'))])
+    """
+    def _require_permission(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+        if not has_permission(user, permission_code, db):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Usuário não tem permissão: {permission_code}"
+            )
+        return True
+
+    return _require_permission

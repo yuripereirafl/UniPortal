@@ -50,6 +50,20 @@ router.beforeEach((to, from, next) => {
   if (!token) {
     next('/login');
   } else {
+    // se a rota exige permissão, validar via $auth (se app estiver montado)
+    const required = to.meta && to.meta.requiredPermission;
+    if (required) {
+      try {
+        const auth = window?.appInstance?.config?.globalProperties?.$auth || null;
+        if (auth && typeof auth.hasPermission === 'function') {
+          if (!auth.hasPermission(required)) {
+            return next('/');
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao checar permissão no router:', e);
+      }
+    }
     next();
   }
 });

@@ -9,6 +9,9 @@ from app.models.funcionario import Funcionario
 from app.models.setor import Setor
 from app.models.sistema import Sistema
 from app.models.grupo_email import GrupoEmail
+# Importar modelos que têm relacionamentos entre si para garantir registro dos mappers
+from app.models.grupos import Grupo
+from app.models.permissao import Permissao
 
 # --- IMPORTAÇÃO DE TODOS OS ROUTERS ---
 # (Mantendo os seus routers existentes)
@@ -24,6 +27,7 @@ from app.routes.cargo_opcoes import router as cargo_opcoes_router
 from app.routes.quadro_colaboradores import router as quadro_colaboradores_router
 from app.routes.usuario import router as usuario_router
 from app.routes.relatorios import router as relatorios_router
+from app.routes.permissoes import router as permissoes_router
 
 # --- NOVAS ROTAS (IMPORTADAS CORRETAMENTE) ---
 from app.routes.metas import router as metas_router
@@ -39,7 +43,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # Usa regex para permitir dinamicamente origens locais (evita hard-code de IPs)
+    allow_origins=[],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,6 +65,7 @@ app.include_router(cargo_opcoes_router)
 app.include_router(quadro_colaboradores_router)
 app.include_router(usuario_router)
 app.include_router(relatorios_router)
+app.include_router(permissoes_router)
 
 # --- REGISTO DAS NOVAS ROTAS ---
 app.include_router(metas_router)

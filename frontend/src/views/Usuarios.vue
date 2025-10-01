@@ -73,10 +73,16 @@
               </th>
               <th>
                 <div class="th-content">
-                  <i class="fas fa-cogs"></i>
-                  Ações
+                      <i class="fas fa-user-shield"></i>
+                      Permissão
                 </div>
               </th>
+                  <th>
+                    <div class="th-content">
+                      <i class="fas fa-cogs"></i>
+                      Ações
+                    </div>
+                  </th>
             </tr>
           </thead>
           <tbody>
@@ -98,12 +104,26 @@
                 </span>
               </td>
               <td>
+                <div>
+                  <div v-if="usuario.permissoes && usuario.permissoes.length > 0">
+                    <small v-for="p in usuario.permissoes" :key="p.id" class="perm-chip">{{ p.codigo }}</small>
+                  </div>
+                  <div v-else>
+                    <small class="perm-chip perm-none">Nenhuma</small>
+                  </div>
+                </div>
+              </td>
+              <td>
                 <div class="action-buttons">
-                  <button @click="editarUsuario(usuario)" class="btn-action btn-edit" title="Editar">
+                  <button v-if="$auth && ($auth.hasPermission('editar_permissoes') || $auth.hasPermission('adm'))" @click="abrirEditarPermissoes(usuario)" class="btn-action btn-perm" title="Editar Permissões">
+                    <i class="fas fa-user-lock"></i>
+                    <span>Permissões</span>
+                  </button>
+                  <button v-if="$auth && ($auth.hasPermission('editar_usuario') || $auth.hasPermission('adm'))" @click="editarUsuario(usuario)" class="btn-action btn-edit" title="Editar">
                     <i class="fas fa-edit"></i>
                     <span>Editar</span>
                   </button>
-                  <button @click="excluirUsuario(usuario.id)" class="btn-action btn-delete" title="Excluir">
+                  <button v-if="$auth && ($auth.hasPermission('excluir_usuario') || $auth.hasPermission('adm'))" @click="excluirUsuario(usuario.id)" class="btn-action btn-delete" title="Excluir">
                     <i class="fas fa-trash"></i>
                     <span>Excluir</span>
                   </button>
@@ -193,6 +213,36 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal de Permissões -->
+    <div v-if="mostrarModalPermissoes" class="modal-overlay" @click="mostrarModalPermissoes = false">
+      <div class="modal-container modal-permissoes" @click.stop>
+        <div class="modal-header">
+          <h3>
+            <i class="fas fa-user-lock"></i>
+            Editar Permissões - {{ usuarioPermissoesEditando ? usuarioPermissoesEditando.username : '' }}
+          </h3>
+          <button @click="mostrarModalPermissoes = false" class="modal-close">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="permissoes-list">
+            <label v-for="p in permissoes" :key="p.id" class="perm-item">
+              <input type="checkbox" :value="p.id" v-model="permissoesSelecionadas" />
+              <div class="perm-text">
+                <div class="perm-code">{{ p.codigo }}</div>
+                <div class="perm-desc">{{ p.descricao }}</div>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="mostrarModalPermissoes = false" class="btn-secondary">Cancelar</button>
+          <button @click="salvarPermissoesUsuario" class="btn-primary perm-save">Salvar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -205,6 +255,7 @@ export default {
   data() {
     return {
       usuarios: [],
+        permissoes: [],
       mostrarFormulario: false,
       usuarioEditando: null,
       salvando: false,
@@ -213,6 +264,9 @@ export default {
         password: '',
         setores_ids: []
       },
+        mostrarModalPermissoes: false,
+        usuarioPermissoesEditando: null,
+        permissoesSelecionadas: [],
       setores: [],
       filtro: '',
       novoSetorIdUsuario: ''
@@ -243,6 +297,15 @@ export default {
       } catch (error) {
         console.error('Erro ao carregar usuários:', error);
         this.usuarios = [];
+      }
+    },
+    async carregarPermissoes() {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/permissoes/`);
+        this.permissoes = res.data;
+      } catch (error) {
+        console.error('Erro ao carregar permissões:', error);
+        this.permissoes = [];
       }
     },
     
@@ -317,6 +380,47 @@ export default {
           console.error('Erro ao excluir usuário:', error);
           alert('Erro ao excluir usuário!');
         }
+      }
+    }
+    ,
+    abrirEditarPermissoes(usuario) {
+      this.usuarioPermissoesEditando = usuario;
+      this.permissoesSelecionadas = Array.isArray(usuario.permissoes) ? usuario.permissoes.map(p => p.id) : [];
+      this.mostrarModalPermissoes = true;
+      // garante que as permissoes estejam carregadas
+      if (!this.permissoes || this.permissoes.length === 0) {
+        this.carregarPermissoes();
+      }
+    },
+    async salvarPermissoesUsuario() {
+      if (!this.usuarioPermissoesEditando) return;
+      try {
+        const payload = { permissoes_ids: this.permissoesSelecionadas };
+        const res = await axios.put(`${API_BASE_URL}/usuarios/${this.usuarioPermissoesEditando.id}/permissoes`, payload);
+        // Atualiza a lista local de usuários rapidamente
+        this.usuarios = this.usuarios.map(u => u.id === this.usuarioPermissoesEditando.id ? { ...u, permissoes: res.data.permissoes } : u);
+
+        // Recarrega o usuário autenticado no frontend (atualiza localStorage e $auth)
+        try {
+          if (this.$auth && typeof this.$auth.loadCurrentUser === 'function') {
+            await this.$auth.loadCurrentUser();
+            // Emite evento global para componentes que queiram reagir à mudança de permissões
+            try {
+              window.dispatchEvent(new CustomEvent('auth:updated', { detail: { user: this.$auth.getCurrentUser() } }));
+            } catch (evErr) {
+              // browsers antigos podem falhar na construção do CustomEvent
+              window.dispatchEvent(new Event('auth:updated'));
+            }
+          }
+        } catch (authErr) {
+          console.warn('Falha ao recarregar usuário após salvar permissões:', authErr);
+        }
+
+        this.mostrarModalPermissoes = false;
+        this.usuarioPermissoesEditando = null;
+      } catch (error) {
+        console.error('Erro ao salvar permissões:', error);
+        alert('Erro ao salvar permissões');
       }
     }
   },
@@ -696,6 +800,55 @@ export default {
   overflow: hidden;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
   animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Modal de permissões específico */
+.modal-permissoes {
+  max-width: 640px;
+  width: 95%;
+}
+
+.permissoes-list {
+  max-height: 320px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.perm-item {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  padding: 0.6rem 0.2rem;
+  border-bottom: 1px dashed #eef2ff;
+}
+
+.perm-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+}
+
+.perm-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.perm-code {
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.perm-desc {
+  font-size: 0.88rem;
+  color: #606f7b;
+}
+
+.btn-primary.perm-save {
+  background: linear-gradient(45deg, #ffd700, #ffcf33);
+  color: #111;
+  box-shadow: 0 8px 30px rgba(255, 203, 6, 0.25);
 }
 
 @keyframes modalSlideIn {
