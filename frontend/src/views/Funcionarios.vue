@@ -191,10 +191,10 @@
           </td>
           <td>
             <div class="action-buttons-table">
-              <button class="btn-editar" @click="abrirEditar(func)">
+              <button v-if="$auth && ($auth.hasPermission('editar_colaborador') || $auth.hasPermission('adm'))" class="btn-editar" @click="abrirEditar(func)">
                 <i class="fas fa-edit"></i>
               </button>
-              <button class="btn-excluir" @click="excluirFuncionario(func.id)">
+              <button v-if="$auth && ($auth.hasPermission('excluir_colaborador') || $auth.hasPermission('adm'))" class="btn-excluir" @click="excluirFuncionario(func.id)">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -272,12 +272,12 @@
               </div>
             </div>
             
-            <div class="card-actions">
-              <button class="btn-edit" @click="abrirEditar(func)">
+              <div class="card-actions">
+              <button v-if="$auth && ($auth.hasPermission('editar_colaborador') || $auth.hasPermission('adm'))" class="btn-edit" @click="abrirEditar(func)">
                 <i class="fas fa-edit"></i>
                 Editar
               </button>
-              <button class="btn-delete" @click="excluirFuncionario(func.id)">
+              <button v-if="$auth && ($auth.hasPermission('excluir_colaborador') || $auth.hasPermission('adm'))" class="btn-delete" @click="excluirFuncionario(func.id)">
                 <i class="fas fa-trash"></i>
                 Excluir
               </button>

@@ -1,5 +1,13 @@
 <template>
   <div id="app">
+    <header class="app-header">
+      <div class="header-left">
+        <!-- logo removed intentionally -->
+      </div>
+      <div class="header-right">
+        <!-- username intentionally hidden -->
+      </div>
+    </header>
     <router-view />
   </div>
 </template>
@@ -7,6 +15,17 @@
 <script>
 export default {
   name: 'App',
+  mounted() {
+    // escutar atualizações de auth para forçar re-render do cabeçalho
+    const onAuthUpdated = () => {
+      this.$forceUpdate && this.$forceUpdate();
+    };
+    window.addEventListener('auth:updated', onAuthUpdated);
+    this._onAuthUpdated = onAuthUpdated;
+  },
+  beforeUnmount() {
+    if (this._onAuthUpdated) window.removeEventListener('auth:updated', this._onAuthUpdated);
+  }
 }
 </script>
 
@@ -28,4 +47,16 @@ export default {
   padding: 0;
   background: var(--cor-branco);
 }
+
+.app-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px 20px;
+  border-bottom:1px solid #eee;
+}
+.logo { height:36px }
+.header-right { display:flex; gap:12px; align-items:center }
+.user-name { font-weight:600; color:#333 }
+.btn-meta { background:#ffd700; border:none; padding:8px 12px; border-radius:8px; cursor:pointer }
 </style>

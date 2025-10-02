@@ -31,6 +31,16 @@ export default {
         params.append('password', this.password);
         const res = await axios.post('/login', params);
         localStorage.setItem('token', res.data.access_token);
+        // Após gravar token, tentar trazer os dados do usuário (permissões)
+        try {
+          if (this.$auth && typeof this.$auth.loadCurrentUser === 'function') {
+            await this.$auth.loadCurrentUser();
+          }
+        } catch (e) {
+          // não bloqueia o login se falhar em carregar /me
+          console.warn('Falha ao carregar usuário após login:', e);
+        }
+
         this.$router.push('/'); // Redireciona para o dashboard
       } catch (e) {
         this.erro = 'Usuário ou senha inválidos!';
