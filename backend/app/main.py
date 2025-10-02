@@ -65,9 +65,7 @@ app.include_router(metas_router)
 app.include_router(realizado_router)
 app.include_router(performance_router) # NOVO
 
-
 # --- OS SEUS ENDPOINTS DE DASHBOARD (MANTIDOS INTACTOS) ---
-
 @app.get("/dashboard/totais")
 def get_totais(db: Session = Depends(get_db)):
     """Retorna os totais para o dashboard"""
