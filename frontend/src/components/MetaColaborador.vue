@@ -484,6 +484,7 @@
 <script>
 import { API_BASE_URL } from '@/api.js'
 import { getRealizadoPainel } from '@/services/painelService.js'
+import vendasService from '@/services/vendasService.js'
 
 export default {
   name: 'MetaColaborador',
@@ -889,6 +890,8 @@ export default {
           // Busca os dados de realizado
           if (colaborador.id_eyal) {
             await this.carregarDadosRealizado(colaborador.id_eyal);
+            // Carrega vendas reais do basecampanhas
+            await this.carregarVendasReais(colaborador.id_eyal, colaborador.mes_ref);
           }
           
           return;
@@ -968,6 +971,8 @@ export default {
         // Agora busca os dados de realizado se tiver id_eyal
         if (metaAtual.id_eyal) {
           await this.carregarDadosRealizado(metaAtual.id_eyal);
+          // Carrega vendas reais do basecampanhas
+          await this.carregarVendasReais(metaAtual.id_eyal, metaAtual.mes_ref);
         }
       } catch (error) {
         this.error = 'Erro ao carregar meta do colaborador.';
@@ -1133,6 +1138,38 @@ export default {
       } catch (error) {
         console.error('❌ Erro ao carregar dados:', error);
         // Mantém os valores zerados que já foram definidos
+      }
+    },
+
+    async carregarVendasReais(codUsuario, mesRef = null) {
+      try {
+        console.log('🛒 Carregando vendas reais para colaborador:', codUsuario, 'mês:', mesRef || 'atual');
+        
+        // Busca vendas usando o novo serviço
+        const dadosVendas = await vendasService.getVendasColaborador(codUsuario, mesRef);
+        
+        if (dadosVendas.success && dadosVendas.resumo) {
+          const resumo = dadosVendas.resumo;
+          
+          // Atualiza os dados de vendas com valores reais
+          this.dadosColaborador.vendas = {
+            odonto: resumo.odonto || 0,
+            babyClick: resumo.baby_click || 0,
+            checkUp: resumo.check_up || 0,
+            drCentral: resumo.dr_central || 0,
+            orcamentos: resumo.orcamentos || 0
+          };
+          
+          console.log('✅ Vendas reais atualizadas:', this.dadosColaborador.vendas);
+          console.log('📊 Total de vendas:', resumo.total_vendas, 'Valor total:', resumo.valor_total);
+          
+        } else {
+          console.log('⚠️ Nenhuma venda encontrada, mantendo valores padrão');
+        }
+        
+      } catch (error) {
+        console.error('❌ Erro ao carregar vendas reais:', error);
+        // Mantém os valores simulados que já existem
       }
     },
     

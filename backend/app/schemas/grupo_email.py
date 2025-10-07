@@ -1,16 +1,14 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, ConfigDict
 from typing import List, Optional
 
 
 class FuncionarioSimple(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     nome: str
     sobrenome: str
     email: Optional[str] = None
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
 
 
 class GrupoEmailBase(BaseModel):
@@ -31,13 +29,11 @@ class GrupoEmailCreate(GrupoEmailBase):
 
 
 class GrupoEmailOut(GrupoEmailBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     funcionarios: List[FuncionarioSimple] = []
     qtd_participantes: int = 0
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
 
     @model_validator(mode='after')
     def compute_qtd(self):
