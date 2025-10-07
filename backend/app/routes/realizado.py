@@ -1,20 +1,198 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from datetime import date
 from app.database import get_db
 from app.models.realizado_colaboradores import RealizadoColaborador
 from app.models.metas_colaboradores import MetaColaborador
+from app.models.painel_resultados_diarios import PainelResultadosDiarios
 from app.schemas.realizado import RealizadoColaborador as RealizadoSchema
-from sqlalchemy import func
+from app.schemas.painel_resultados import PainelResultadosResponse
+from sqlalchemy import func, and_, desc
 
 
 from pydantic import BaseModel
 from typing import List
+from decimal import Decimal
 
 router = APIRouter(
     prefix="/realizado",
     tags=["Realizado"]
 )
+
+# ========================================
+# NOVAS ROTAS OTIMIZADAS - PAINEL RESULTADOS
+# ========================================
+
+@router.get("/painel/{identificador}")
+def get_realizado_painel(
+    identificador: str, 
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    🚀 NOVA ROTA OTIMIZADA - Usa a tabela painelresultadosdiarios
+    
+    Retorna os dados de realizado já calculados e tratados.
+    
+    Args:
+        identificador: ID Eyal ou CPF do colaborador
+        mes_ref: Mês de referência (formato YYYY-MM-DD, opcional - usa último disponível)
+        
+    Returns:
+        Dados completos do colaborador com realizado individual e final já calculados
+    """
+    try:
+        # Construir query base
+        query = db.query(PainelResultadosDiarios)
+        
+        # Filtrar por ID Eyal ou CPF
+        if len(identificador) == 11 or len(identificador) == 14:  # CPF
+            query = query.filter(PainelResultadosDiarios.cpf == identificador)
+        else:  # ID Eyal
+            query = query.filter(PainelResultadosDiarios.id_eyal == identificador)
+        
+        # Se não especificou mês, pegar o mais recente
+        if not mes_ref:
+            # Buscar a data de carga mais recente
+            subquery = db.query(
+                func.max(PainelResultadosDiarios.data_carga)
+            ).scalar_subquery()
+            
+            query = query.filter(PainelResultadosDiarios.data_carga == subquery)
+        else:
+            # Usar mês especificado
+            query = query.filter(PainelResultadosDiarios.mes_ref == mes_ref)
+            # Pegar a carga mais recente desse mês
+            subquery = db.query(
+                func.max(PainelResultadosDiarios.data_carga)
+            ).filter(PainelResultadosDiarios.mes_ref == mes_ref).scalar_subquery()
+            query = query.filter(PainelResultadosDiarios.data_carga == subquery)
+        
+        # Executar query
+        resultado = query.first()
+        
+        if not resultado:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Dados não encontrados para o colaborador {identificador}"
+            )
+        
+        # Buscar meta do colaborador
+        meta_colaborador = db.query(MetaColaborador).filter(
+            MetaColaborador.id_eyal == resultado.id_eyal
+        ).first()
+        
+        meta_final = float(meta_colaborador.meta_final) if meta_colaborador and meta_colaborador.meta_final else 0
+        realizado_final = float(resultado.realizado_final or 0)
+        percentual_atingido = (realizado_final / meta_final * 100) if meta_final > 0 else 0
+        
+        # Montar resposta estruturada
+        return {
+            "colaborador": {
+                "id_eyal": resultado.id_eyal,
+                "cpf": resultado.cpf,
+                "nome": resultado.nome,
+                "cargo": resultado.cargo,
+                "nivel": resultado.nivel,
+                "unidade": resultado.unidade,
+                "lider_direto": resultado.lider_direto,
+                "meta_final": meta_final
+            },
+            "realizado": {
+                "realizado_individual": float(resultado.realizado_individual or 0),
+                "realizado_final": realizado_final,
+                "percentual_atingido": round(percentual_atingido, 2),
+                "mes_referencia": str(resultado.mes_ref),
+                "data_carga": str(resultado.data_carga)
+            },
+            "metadata": {
+                "fonte": "painelresultadosdiarios",
+                "tipo_calculo": "Pré-calculado com regras de negócio aplicadas",
+                "observacao": "realizado_final já inclui regras de liderança e equipe"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar dados do painel: {str(e)}"
+        )
+
+
+@router.get("/painel/historico/{identificador}")
+def get_historico_realizado(
+    identificador: str,
+    limite: int = 12,
+    db: Session = Depends(get_db)
+):
+    """
+    📊 Histórico de realizado do colaborador
+    
+    Retorna os últimos N meses de realizado do colaborador.
+    
+    Args:
+        identificador: ID Eyal ou CPF
+        limite: Quantidade de meses a retornar (padrão: 12)
+    """
+    try:
+        # Construir query
+        query = db.query(PainelResultadosDiarios)
+        
+        # Filtrar por ID ou CPF
+        if len(identificador) == 11 or len(identificador) == 14:
+            query = query.filter(PainelResultadosDiarios.cpf == identificador)
+        else:
+            query = query.filter(PainelResultadosDiarios.id_eyal == identificador)
+        
+        # Ordenar por mês de referência (mais recente primeiro)
+        query = query.order_by(desc(PainelResultadosDiarios.mes_ref))
+        
+        # Limitar resultados
+        resultados = query.limit(limite).all()
+        
+        if not resultados:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Nenhum histórico encontrado para {identificador}"
+            )
+        
+        # Formatar resposta
+        historico = []
+        for r in resultados:
+            historico.append({
+                "mes_referencia": str(r.mes_ref),
+                "realizado_individual": float(r.realizado_individual or 0),
+                "realizado_final": float(r.realizado_final or 0),
+                "unidade": r.unidade,
+                "cargo": r.cargo,
+                "data_carga": str(r.data_carga)
+            })
+        
+        return {
+            "colaborador": {
+                "id_eyal": resultados[0].id_eyal,
+                "nome": resultados[0].nome,
+                "cpf": resultados[0].cpf
+            },
+            "historico": historico,
+            "total_meses": len(historico)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar histórico: {str(e)}"
+        )
+
+# ========================================
+# ROTAS LEGADAS (mantidas para compatibilidade)
+# ========================================
+
 
 @router.get("/colaborador/{identificador}", response_model=List[RealizadoSchema])
 def get_realizado_colaborador(identificador: int, db: Session = Depends(get_db)):
