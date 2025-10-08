@@ -146,13 +146,14 @@
           <div class="header-title">
             <h1>
               <i class="fas fa-user-chart header-icon"></i>
-              <span v-if="colaboradorPreSelecionado">Meta de {{ colaboradorPreSelecionado.nome }}</span>
+              <span v-if="modoUsuarioLogado">Minha Meta Individual</span>
+              <span v-else-if="colaboradorPreSelecionado">Meta de {{ colaboradorPreSelecionado.nome }}</span>
               <span v-else>Meta Individual dos Colaboradores</span>
             </h1>
           </div>
         </div>
         <div class="header-right">
-          <div class="controls-group" v-if="!colaboradorPreSelecionado">
+          <div class="controls-group" v-if="!colaboradorPreSelecionado && !modoUsuarioLogado">
             <div class="filter-control">
               <label>
                 <i class="fas fa-user"></i>
@@ -186,8 +187,8 @@
       <p>Carregando meta do colaborador...</p>
     </div>
 
-    <!-- Seleção de Colaborador (só mostra se não há colaborador pré-selecionado) -->
-    <div v-else-if="!colaboradorSelecionado && !colaboradorPreSelecionado" class="selecao-colaborador">
+    <!-- Seleção de Colaborador (só mostra se não há colaborador pré-selecionado e não está no modo usuário logado) -->
+    <div v-else-if="!colaboradorSelecionado && !colaboradorPreSelecionado && !modoUsuarioLogado" class="selecao-colaborador">
       <div class="instrucao-card">
         <div class="instrucao-icon">
           <i class="fas fa-hand-point-up"></i>
@@ -482,9 +483,8 @@
 </template>
 
 <script>
+import axios from 'axios'
 import { API_BASE_URL } from '@/api.js'
-import { getRealizadoPainel } from '@/services/painelService.js'
-import vendasService from '@/services/vendasService.js'
 
 export default {
   name: 'MetaColaborador',
@@ -507,6 +507,7 @@ export default {
       dadosColaborador: {},
       mostrarRanking: true, // Modal de ranking aparece primeiro
       error: null,
+      modoUsuarioLogado: false, // Controla se deve mostrar apenas a meta do usuário logado
       // Dados reais do ranking
       topVendedores: [],
       estatisticasGerais: {
@@ -606,6 +607,9 @@ export default {
     }
   },
   mounted() {
+    // Verificar se deve mostrar apenas a meta do usuário logado
+    this.verificarModoUsuarioLogado();
+    
     // Carrega colaboradores com metas diretamente da API ao invés de depender das props
     this.carregarColaboradoresComMetas();
     
@@ -634,6 +638,117 @@ export default {
     }
   },
   methods: {
+    verificarModoUsuarioLogado() {
+      try {
+        const auth = this.$auth;
+        if (auth && typeof auth.getCurrentUser === 'function' && typeof auth.hasPermission === 'function') {
+          const user = auth.getCurrentUser();
+          const temPermissaoMeta = auth.hasPermission('meta_colaborador');
+          const temPermissaoAdmin = auth.hasPermission('adm');
+          const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
+          const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
+
+          // Se tem permissão meta_colaborador mas NÃO tem permissões administrativas,
+          // deve ver apenas sua própria meta
+          this.modoUsuarioLogado = temPermissaoMeta && !temPermissaoAdmin && !temPermissaoEditarColaborador && !temPermissaoEditarUsuario;
+          
+          if (this.modoUsuarioLogado) {
+            console.log('Modo usuário logado ativado - usuário tem apenas permissão meta_colaborador');
+            // Pular o ranking e carregar diretamente a meta
+            this.mostrarRanking = false;
+            
+            // Verificar se o usuário tem funcionário associado
+            if (user && user.funcionario && user.funcionario.cpf) {
+              console.log('Usuário tem funcionário associado:', user.funcionario);
+              // Auto-selecionar o colaborador baseado no CPF do funcionário
+              this.colaboradorSelecionado = user.funcionario.cpf;
+              // Carregar a meta do usuário usando o endpoint específico
+              this.carregarMinhaMetaIndividual();
+            } else {
+              console.warn('Usuário tem permissão meta_colaborador mas não tem funcionário associado');
+              this.error = 'Seu usuário não está associado a um funcionário. Entre em contato com o administrador.';
+              this.carregando = false;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao verificar modo usuário logado:', error);
+        this.modoUsuarioLogado = false;
+      }
+    },
+
+    async carregarMinhaMetaIndividual() {
+      this.carregando = true;
+      this.error = null;
+      
+      try {
+        console.log('Carregando minha meta individual...');
+        const response = await axios.get('/metas/minha-meta');
+        
+        console.log('Minha meta carregada:', response.data);
+        
+        if (response.data && response.data.length > 0) {
+          // Pegar a meta mais recente (ordenar por mes_ref decrescente)
+          const metaAtual = response.data.sort((a, b) => {
+            if (a.mes_ref > b.mes_ref) return -1;
+            if (a.mes_ref < b.mes_ref) return 1;
+            return 0;
+          })[0];
+          
+          // Processar dados da meta para o formato esperado pelo componente
+          await this.processarDadosMetaIndividual(metaAtual);
+        } else {
+          this.error = 'Nenhuma meta encontrada para seu perfil.';
+        }
+      } catch (error) {
+        console.error('Erro ao carregar minha meta:', error);
+        if (error.response && error.response.status === 404) {
+          const errorData = error.response.data;
+          this.error = errorData.detail || 'Nenhuma meta encontrada para seu perfil.';
+        } else {
+          this.error = 'Erro ao carregar sua meta. Tente novamente.';
+        }
+      } finally {
+        this.carregando = false;
+      }
+    },
+
+    async processarDadosMetaIndividual(meta) {
+      // Adaptar os dados da meta para o formato esperado pelo componente
+      this.dadosColaborador = {
+        nome: meta.nome,
+        cargo: meta.cargo,
+        unidade: meta.unidade,
+        equipe: meta.equipe,
+        metaTotal: meta.meta_final || 0,
+        metaDiaria: meta.meta_diaria || 0,
+        totalRealizado: 0, // TODO: buscar dados reais de performance
+        realizadoDia: 0, // TODO: buscar dados reais de performance
+        percentualMeta: 0, // TODO: calcular baseado no realizado
+        nps: '83,33', // Valor padrão
+        vendas: {
+          odonto: 0,
+          babyClick: 0,
+          checkUp: 0,
+          drCentral: 0,
+          orcamentos: 0
+        },
+        comissao: {
+          projecaoMeta: 0,
+          campanhas: 0
+        },
+        categorias: [
+          { nome: 'Odonto', icon: 'fas fa-tooth', meta: 10, realizado: 6 },
+          { nome: 'Check-Up', icon: 'fas fa-stethoscope', meta: 50, realizado: 35 },
+          { nome: 'Dr Central', icon: 'fas fa-user-md', meta: 20, realizado: 15 }
+        ],
+        ultimos7Dias: 0,
+        mesAnterior: 0
+      };
+      
+      console.log('Dados do colaborador processados:', this.dadosColaborador);
+    },
+
     async carregarColaboradoresComMetas() {
       this.carregandoColaboradores = true;
       try {
@@ -890,8 +1005,6 @@ export default {
           // Busca os dados de realizado
           if (colaborador.id_eyal) {
             await this.carregarDadosRealizado(colaborador.id_eyal);
-            // Carrega vendas reais do basecampanhas
-            await this.carregarVendasReais(colaborador.id_eyal, colaborador.mes_ref);
           }
           
           return;
@@ -971,8 +1084,6 @@ export default {
         // Agora busca os dados de realizado se tiver id_eyal
         if (metaAtual.id_eyal) {
           await this.carregarDadosRealizado(metaAtual.id_eyal);
-          // Carrega vendas reais do basecampanhas
-          await this.carregarVendasReais(metaAtual.id_eyal, metaAtual.mes_ref);
         }
       } catch (error) {
         this.error = 'Erro ao carregar meta do colaborador.';
@@ -984,25 +1095,20 @@ export default {
     
     async carregarDadosRealizado(idEyal) {
       try {
-        console.log('🚀 Carregando dados otimizados do painel para ID Eyal:', idEyal);
+        const response = await fetch(`${API_BASE_URL}/realizado/colaborador/${idEyal}/resumo`);
         
-        // Usa o novo serviço otimizado do painel
-        const resultado = await getRealizadoPainel(idEyal);
-        
-        if (resultado.success && resultado.data) {
-          const dadosPainel = resultado.data;
-          console.log('✅ Dados do painel carregados:', dadosPainel);
+        if (response.ok) {
+          const dadosRealizado = await response.json();
+          console.log('Dados de realizado:', dadosRealizado);
           
-          // Extrai dados do realizado da estrutura otimizada
-          const realizado = dadosPainel.realizado || {};
-          const colaborador = dadosPainel.colaborador || {};
+          // Calcula o total realizado (remove o TOTAL_GERAL do cálculo)
+          const totalRealizado = dadosRealizado.TOTAL_GERAL || 0;
           
-          // Atualiza os dados principais do colaborador com valores pré-calculados
-          const totalRealizado = realizado.realizado_final || 0;
+          // Atualiza os dados do colaborador
           this.dadosColaborador.totalRealizado = totalRealizado;
-          
-          // 🔧 FIX: O backend JÁ retorna em % (0-100), não multiplicar novamente!
-          this.dadosColaborador.percentualMeta = realizado.percentual_atingido || 0;
+          this.dadosColaborador.percentualMeta = this.dadosColaborador.metaTotal > 0 
+            ? (totalRealizado / this.dadosColaborador.metaTotal) * 100 
+            : 0;
 
           // Calcula o realizado diário baseado na performance atual
           const diasDecorridos = new Date().getDate();
@@ -1011,7 +1117,7 @@ export default {
             : 0;
 
           // Atualiza dados de vendas baseados no realizado (simulação inteligente)
-          const baseVendas = Math.floor(totalRealizado / 1000);
+          const baseVendas = Math.floor(totalRealizado / 1000); // Aproximação baseada no realizado
           this.dadosColaborador.vendas = {
             odonto: Math.max(1, Math.floor(baseVendas * 0.1)),
             babyClick: Math.floor(baseVendas * 0.05),
@@ -1023,153 +1129,70 @@ export default {
           const percentualPerformance = this.dadosColaborador.percentualMeta / 100;
           this.dadosColaborador.comissao = {
             projecaoMeta: Math.round(120 * percentualPerformance),
-            campanhas: Math.round(157 * Math.min(percentualPerformance, 1.2))
+            campanhas: Math.round(157 * Math.min(percentualPerformance, 1.2)) // Pode ser até 20% extra
           };
           
-          // Cria categorias distribuídas proporcionalmente
-          // Como o painel já tem o realizado final calculado, distribuímos proporcionalmente
+          // Cria categorias baseadas nos dados de realizado
+          const categoriasDoBackend = Object.entries(dadosRealizado)
+            .filter(([key]) => key !== 'TOTAL_GERAL' && 
+                               key !== 'QTDE_LIDERADOS' && 
+                               key !== 'inclui_liderados' &&
+                               !key.toLowerCase().includes('liderados'))
+            .map(([tipo, realizado]) => ({
+              nome: tipo || 'Outros',
+              meta: Math.round(this.dadosColaborador.metaTotal * 0.25), // Distribui meta proporcionalmente
+              realizado: realizado,
+              icon: 'fas fa-chart-bar'
+            }));
+
+          // Garante que as categorias principais estejam sempre presentes
           const categoriasEssenciais = ['Odonto', 'Check-up', 'Dr. Central', 'BabyClick'];
-          const metaPorCategoria = Math.round(this.dadosColaborador.metaTotal / categoriasEssenciais.length);
-          const realizadoPorCategoria = Math.round(totalRealizado / categoriasEssenciais.length);
-          
-          const categoriasFinais = categoriasEssenciais.map(nomeCategoria => ({
-            nome: nomeCategoria,
-            meta: metaPorCategoria,
-            realizado: realizadoPorCategoria * (0.8 + Math.random() * 0.4), // Varia entre 80% e 120%
-            icon: this.getIconeCategoria(nomeCategoria)
-          }));
+          const categoriasFinais = [];
+
+          categoriasEssenciais.forEach(nomeCategoria => {
+            const categoriaExistente = categoriasDoBackend.find(cat => 
+              cat.nome.toLowerCase().includes(nomeCategoria.toLowerCase()) ||
+              nomeCategoria.toLowerCase().includes(cat.nome.toLowerCase())
+            );
+
+            if (categoriaExistente) {
+              // Usa os dados do backend
+              categoriasFinais.push({
+                ...categoriaExistente,
+                nome: nomeCategoria, // Padroniza o nome
+                icon: this.getIconeCategoria(nomeCategoria)
+              });
+            } else {
+              // Cria categoria com dados padrão
+              categoriasFinais.push({
+                nome: nomeCategoria,
+                meta: Math.round(this.dadosColaborador.metaTotal * 0.25),
+                realizado: 0,
+                icon: this.getIconeCategoria(nomeCategoria)
+              });
+            }
+          });
+
+          // Adiciona outras categorias do backend que não estão nas essenciais
+          categoriasDoBackend.forEach(categoria => {
+            const jaIncluida = categoriasFinais.some(cat => 
+              cat.nome.toLowerCase().includes(categoria.nome.toLowerCase()) ||
+              categoria.nome.toLowerCase().includes(cat.nome.toLowerCase())
+            );
+            
+            if (!jaIncluida) {
+              categoriasFinais.push(categoria);
+            }
+          });
 
           this.dadosColaborador.categorias = categoriasFinais;
-          
-          console.log('📊 Dados atualizados:', {
-            totalRealizado: this.dadosColaborador.totalRealizado,
-            percentualMeta: this.dadosColaborador.percentualMeta.toFixed(2) + '%',
-            fonte: dadosPainel.metadata?.fonte
-          });
         } else {
-          console.log('⚠️ Fallback: Tentando rota legada para ID Eyal:', idEyal);
-          
-          // Fallback para a rota legada se o painel não tiver dados
-          const response = await fetch(`${API_BASE_URL}/realizado/colaborador/${idEyal}/resumo`);
-          
-          if (response.ok) {
-            const dadosRealizado = await response.json();
-            console.log('📁 Dados da rota legada:', dadosRealizado);
-            
-            // Usa a lógica antiga como fallback
-            const totalRealizado = dadosRealizado.TOTAL_GERAL || 0;
-            this.dadosColaborador.totalRealizado = totalRealizado;
-            this.dadosColaborador.percentualMeta = this.dadosColaborador.metaTotal > 0 
-              ? (totalRealizado / this.dadosColaborador.metaTotal) * 100 
-              : 0;
-
-            const diasDecorridos = new Date().getDate();
-            this.dadosColaborador.realizadoDia = diasDecorridos > 0 
-              ? Math.round((totalRealizado / diasDecorridos) * 100) / 100
-              : 0;
-
-            const baseVendas = Math.floor(totalRealizado / 1000);
-            this.dadosColaborador.vendas = {
-              odonto: Math.max(1, Math.floor(baseVendas * 0.1)),
-              babyClick: Math.floor(baseVendas * 0.05),
-              checkUp: Math.max(1, Math.floor(baseVendas * 0.6)),
-              orcamentos: Math.max(1, Math.floor(baseVendas * 1.2))
-            };
-
-            const percentualPerformance = this.dadosColaborador.percentualMeta / 100;
-            this.dadosColaborador.comissao = {
-              projecaoMeta: Math.round(120 * percentualPerformance),
-              campanhas: Math.round(157 * Math.min(percentualPerformance, 1.2))
-            };
-            
-            const categoriasDoBackend = Object.entries(dadosRealizado)
-              .filter(([key]) => key !== 'TOTAL_GERAL' && 
-                                 key !== 'QTDE_LIDERADOS' && 
-                                 key !== 'inclui_liderados' &&
-                                 !key.toLowerCase().includes('liderados'))
-              .map(([tipo, realizado]) => ({
-                nome: tipo || 'Outros',
-                meta: Math.round(this.dadosColaborador.metaTotal * 0.25),
-                realizado: realizado,
-                icon: 'fas fa-chart-bar'
-              }));
-
-            const categoriasEssenciais = ['Odonto', 'Check-up', 'Dr. Central', 'BabyClick'];
-            const categoriasFinais = [];
-
-            categoriasEssenciais.forEach(nomeCategoria => {
-              const categoriaExistente = categoriasDoBackend.find(cat => 
-                cat.nome.toLowerCase().includes(nomeCategoria.toLowerCase()) ||
-                nomeCategoria.toLowerCase().includes(cat.nome.toLowerCase())
-              );
-
-              if (categoriaExistente) {
-                categoriasFinais.push({
-                  ...categoriaExistente,
-                  nome: nomeCategoria,
-                  icon: this.getIconeCategoria(nomeCategoria)
-                });
-              } else {
-                categoriasFinais.push({
-                  nome: nomeCategoria,
-                  meta: Math.round(this.dadosColaborador.metaTotal * 0.25),
-                  realizado: 0,
-                  icon: this.getIconeCategoria(nomeCategoria)
-                });
-              }
-            });
-
-            categoriasDoBackend.forEach(categoria => {
-              const jaIncluida = categoriasFinais.some(cat => 
-                cat.nome.toLowerCase().includes(categoria.nome.toLowerCase()) ||
-                categoria.nome.toLowerCase().includes(cat.nome.toLowerCase())
-              );
-              
-              if (!jaIncluida) {
-                categoriasFinais.push(categoria);
-              }
-            });
-
-            this.dadosColaborador.categorias = categoriasFinais;
-          } else {
-            console.log(`ℹ️ Nenhum dado disponível para ID Eyal ${idEyal}`);
-          }
+          console.log(`Info: Funcionário ID Eyal ${idEyal} não possui dados de realizado`);
+          // Mantém os valores zerados que já foram definidos
         }
       } catch (error) {
-        console.error('❌ Erro ao carregar dados:', error);
+        console.error('Erro ao carregar dados de realizado:', error);
         // Mantém os valores zerados que já foram definidos
-      }
-    },
-
-    async carregarVendasReais(codUsuario, mesRef = null) {
-      try {
-        console.log('🛒 Carregando vendas reais para colaborador:', codUsuario, 'mês:', mesRef || 'atual');
-        
-        // Busca vendas usando o novo serviço
-        const dadosVendas = await vendasService.getVendasColaborador(codUsuario, mesRef);
-        
-        if (dadosVendas.success && dadosVendas.resumo) {
-          const resumo = dadosVendas.resumo;
-          
-          // Atualiza os dados de vendas com valores reais
-          this.dadosColaborador.vendas = {
-            odonto: resumo.odonto || 0,
-            babyClick: resumo.baby_click || 0,
-            checkUp: resumo.check_up || 0,
-            drCentral: resumo.dr_central || 0,
-            orcamentos: resumo.orcamentos || 0
-          };
-          
-          console.log('✅ Vendas reais atualizadas:', this.dadosColaborador.vendas);
-          console.log('📊 Total de vendas:', resumo.total_vendas, 'Valor total:', resumo.valor_total);
-          
-        } else {
-          console.log('⚠️ Nenhuma venda encontrada, mantendo valores padrão');
-        }
-        
-      } catch (error) {
-        console.error('❌ Erro ao carregar vendas reais:', error);
-        // Mantém os valores simulados que já existem
       }
     },
     
