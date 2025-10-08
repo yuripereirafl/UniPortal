@@ -148,7 +148,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 @router.get('/me')
 def read_current_user(current_user: UsuarioModel = Depends(get_current_user)):
-    """Retorna os dados do usuário autenticado, incluindo permissões e setores."""
+    """Retorna os dados do usuário autenticado, incluindo permissões, setores e funcionário associado."""
     db = SessionLocal()
     # carregar permissoes via tabela usuarios_permissoes
     from ..models.permissao import Permissao as PermissaoModel
@@ -169,9 +169,25 @@ def read_current_user(current_user: UsuarioModel = Depends(get_current_user)):
         setores = [{"id": s.id, "nome": s.nome, "descricao": s.descricao} for s in user_with_setores.setores]
     else:
         setores = []
+    
+    # Carregar dados do funcionário associado ao usuário
+    funcionario_data = None
+    if current_user.id_funcionario:
+        from ..models.funcionario import Funcionario
+        funcionario = db.query(Funcionario).filter(Funcionario.id == current_user.id_funcionario).first()
+        if funcionario:
+            funcionario_data = {
+                "id": funcionario.id,
+                "nome": funcionario.nome,
+                "sobrenome": funcionario.sobrenome,
+                "cpf": funcionario.cpf,
+                "email": funcionario.email,
+                "equipe": funcionario.equipe
+            }
+    
     # DEBUG: mostrar no log do servidor as permissões retornadas para este usuário
     try:
-        print(f"[DEBUG /me] usuario={current_user.username} permissoes={[{'id': p.id, 'codigo': p.codigo, 'descricao': p.descricao} for p in permissoes]}")
+        print(f"[DEBUG /me] usuario={current_user.username} funcionario_id={current_user.id_funcionario} permissoes={[{'id': p.id, 'codigo': p.codigo, 'descricao': p.descricao} for p in permissoes]}")
     except Exception:
         pass
     db.close()
@@ -193,8 +209,10 @@ def read_current_user(current_user: UsuarioModel = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "username": current_user.username,
+        "id_funcionario": current_user.id_funcionario,
         "setores": setores,
-        "permissoes": permissoes_out
+        "permissoes": permissoes_out,
+        "funcionario": funcionario_data
     }
 
 
@@ -228,41 +246,67 @@ class UsuarioUpdate(BaseModel):
 @router.put('/usuarios/{id}')
 def editar_usuario(id: int, usuario_update: UsuarioUpdate):
     db = SessionLocal()
-    usuario = db.query(UsuarioModel).filter(UsuarioModel.id == id).first()
-    if not usuario:
+    try:
+        usuario = db.query(UsuarioModel).filter(UsuarioModel.id == id).first()
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        
+        if usuario_update.username:
+            usuario.username = usuario_update.username
+        if usuario_update.password:
+            usuario.hashed_password = get_password_hash(usuario_update.password)
+        
+        if usuario_update.setores_ids is not None:
+            # Primeiro, remove associações antigas de setores do usuário
+            from ..models.usuario import usuario_setor
+            db.execute(usuario_setor.delete().where(usuario_setor.c.usuario_id == id))
+            
+            # Adiciona novas associações de setores
+            for setor_id in usuario_update.setores_ids:
+                db.execute(usuario_setor.insert().values(usuario_id=id, setor_id=setor_id))
+            
+            # Atualiza setores do funcionário vinculado se existir
+            if usuario.id_funcionario:
+                from ..models.funcionario import funcionario_setor
+                # Remove associações antigas do funcionário
+                db.execute(funcionario_setor.delete().where(funcionario_setor.c.funcionario_id == usuario.id_funcionario))
+                # Adiciona novas associações
+                for setor_id in usuario_update.setores_ids:
+                    db.execute(funcionario_setor.insert().values(funcionario_id=usuario.id_funcionario, setor_id=setor_id))
+        
+        db.commit()
+        return {"msg": "Usuário e funcionário atualizados"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao editar usuário: {str(e)}")
+    finally:
         db.close()
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    if usuario_update.username:
-        usuario.username = usuario_update.username
-    if usuario_update.password:
-        usuario.hashed_password = get_password_hash(usuario_update.password)
-    if usuario_update.setores_ids is not None:
-        # Atualiza setores do usuário
-        from ..models.setor import Setor
-        setores = db.query(Setor).filter(Setor.id.in_(usuario_update.setores_ids)).all()
-        usuario.setores = setores
-        # Atualiza setores do funcionário vinculado
-        if usuario.id_funcionario:
-            from ..models.funcionario import Funcionario
-            funcionario = db.query(Funcionario).filter(Funcionario.id == usuario.id_funcionario).first()
-            if funcionario:
-                funcionario.setores = setores
-    db.commit()
-    db.close()
-    return {"msg": "Usuário e funcionário atualizados"}
 
 # Endpoint para excluir usuário
 @router.delete('/usuarios/{id}')
 def excluir_usuario(id: int):
     db = SessionLocal()
-    usuario = db.query(UsuarioModel).filter(UsuarioModel.id == id).first()
-    if not usuario:
+    try:
+        usuario = db.query(UsuarioModel).filter(UsuarioModel.id == id).first()
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        
+        # Primeiro, remover associações de permissões diretas
+        db.execute(usuarios_permissoes.delete().where(usuarios_permissoes.c.usuario_id == id))
+        
+        # Remover associações de grupos
+        from ..models.usuario_grupo import usuario_grupo
+        db.execute(usuario_grupo.delete().where(usuario_grupo.c.usuario_id == id))
+        
+        # Agora excluir o usuário
+        db.delete(usuario)
+        db.commit()
+        return {"msg": "Usuário excluído"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao excluir usuário: {str(e)}")
+    finally:
         db.close()
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    db.delete(usuario)
-    db.commit()
-    db.close()
-    return {"msg": "Usuário excluído"}
 
 
 @router.put('/usuarios/{id}/permissoes')

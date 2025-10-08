@@ -146,13 +146,14 @@
           <div class="header-title">
             <h1>
               <i class="fas fa-user-chart header-icon"></i>
-              <span v-if="colaboradorPreSelecionado">Meta de {{ colaboradorPreSelecionado.nome }}</span>
+              <span v-if="modoUsuarioLogado">Minha Meta Individual</span>
+              <span v-else-if="colaboradorPreSelecionado">Meta de {{ colaboradorPreSelecionado.nome }}</span>
               <span v-else>Meta Individual dos Colaboradores</span>
             </h1>
           </div>
         </div>
         <div class="header-right">
-          <div class="controls-group" v-if="!colaboradorPreSelecionado">
+          <div class="controls-group" v-if="!colaboradorPreSelecionado && !modoUsuarioLogado">
             <div class="filter-control">
               <label>
                 <i class="fas fa-user"></i>
@@ -186,8 +187,8 @@
       <p>Carregando meta do colaborador...</p>
     </div>
 
-    <!-- Seleção de Colaborador (só mostra se não há colaborador pré-selecionado) -->
-    <div v-else-if="!colaboradorSelecionado && !colaboradorPreSelecionado" class="selecao-colaborador">
+    <!-- Seleção de Colaborador (só mostra se não há colaborador pré-selecionado e não está no modo usuário logado) -->
+    <div v-else-if="!colaboradorSelecionado && !colaboradorPreSelecionado && !modoUsuarioLogado" class="selecao-colaborador">
       <div class="instrucao-card">
         <div class="instrucao-icon">
           <i class="fas fa-hand-point-up"></i>
@@ -482,6 +483,7 @@
 </template>
 
 <script>
+import axios from 'axios'
 import { API_BASE_URL } from '@/api.js'
 
 export default {
@@ -505,6 +507,7 @@ export default {
       dadosColaborador: {},
       mostrarRanking: true, // Modal de ranking aparece primeiro
       error: null,
+      modoUsuarioLogado: false, // Controla se deve mostrar apenas a meta do usuário logado
       // Dados reais do ranking
       topVendedores: [],
       estatisticasGerais: {
@@ -604,6 +607,9 @@ export default {
     }
   },
   mounted() {
+    // Verificar se deve mostrar apenas a meta do usuário logado
+    this.verificarModoUsuarioLogado();
+    
     // Carrega colaboradores com metas diretamente da API ao invés de depender das props
     this.carregarColaboradoresComMetas();
     
@@ -632,6 +638,117 @@ export default {
     }
   },
   methods: {
+    verificarModoUsuarioLogado() {
+      try {
+        const auth = this.$auth;
+        if (auth && typeof auth.getCurrentUser === 'function' && typeof auth.hasPermission === 'function') {
+          const user = auth.getCurrentUser();
+          const temPermissaoMeta = auth.hasPermission('meta_colaborador');
+          const temPermissaoAdmin = auth.hasPermission('adm');
+          const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
+          const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
+
+          // Se tem permissão meta_colaborador mas NÃO tem permissões administrativas,
+          // deve ver apenas sua própria meta
+          this.modoUsuarioLogado = temPermissaoMeta && !temPermissaoAdmin && !temPermissaoEditarColaborador && !temPermissaoEditarUsuario;
+          
+          if (this.modoUsuarioLogado) {
+            console.log('Modo usuário logado ativado - usuário tem apenas permissão meta_colaborador');
+            // Pular o ranking e carregar diretamente a meta
+            this.mostrarRanking = false;
+            
+            // Verificar se o usuário tem funcionário associado
+            if (user && user.funcionario && user.funcionario.cpf) {
+              console.log('Usuário tem funcionário associado:', user.funcionario);
+              // Auto-selecionar o colaborador baseado no CPF do funcionário
+              this.colaboradorSelecionado = user.funcionario.cpf;
+              // Carregar a meta do usuário usando o endpoint específico
+              this.carregarMinhaMetaIndividual();
+            } else {
+              console.warn('Usuário tem permissão meta_colaborador mas não tem funcionário associado');
+              this.error = 'Seu usuário não está associado a um funcionário. Entre em contato com o administrador.';
+              this.carregando = false;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao verificar modo usuário logado:', error);
+        this.modoUsuarioLogado = false;
+      }
+    },
+
+    async carregarMinhaMetaIndividual() {
+      this.carregando = true;
+      this.error = null;
+      
+      try {
+        console.log('Carregando minha meta individual...');
+        const response = await axios.get('/metas/minha-meta');
+        
+        console.log('Minha meta carregada:', response.data);
+        
+        if (response.data && response.data.length > 0) {
+          // Pegar a meta mais recente (ordenar por mes_ref decrescente)
+          const metaAtual = response.data.sort((a, b) => {
+            if (a.mes_ref > b.mes_ref) return -1;
+            if (a.mes_ref < b.mes_ref) return 1;
+            return 0;
+          })[0];
+          
+          // Processar dados da meta para o formato esperado pelo componente
+          await this.processarDadosMetaIndividual(metaAtual);
+        } else {
+          this.error = 'Nenhuma meta encontrada para seu perfil.';
+        }
+      } catch (error) {
+        console.error('Erro ao carregar minha meta:', error);
+        if (error.response && error.response.status === 404) {
+          const errorData = error.response.data;
+          this.error = errorData.detail || 'Nenhuma meta encontrada para seu perfil.';
+        } else {
+          this.error = 'Erro ao carregar sua meta. Tente novamente.';
+        }
+      } finally {
+        this.carregando = false;
+      }
+    },
+
+    async processarDadosMetaIndividual(meta) {
+      // Adaptar os dados da meta para o formato esperado pelo componente
+      this.dadosColaborador = {
+        nome: meta.nome,
+        cargo: meta.cargo,
+        unidade: meta.unidade,
+        equipe: meta.equipe,
+        metaTotal: meta.meta_final || 0,
+        metaDiaria: meta.meta_diaria || 0,
+        totalRealizado: 0, // TODO: buscar dados reais de performance
+        realizadoDia: 0, // TODO: buscar dados reais de performance
+        percentualMeta: 0, // TODO: calcular baseado no realizado
+        nps: '83,33', // Valor padrão
+        vendas: {
+          odonto: 0,
+          babyClick: 0,
+          checkUp: 0,
+          drCentral: 0,
+          orcamentos: 0
+        },
+        comissao: {
+          projecaoMeta: 0,
+          campanhas: 0
+        },
+        categorias: [
+          { nome: 'Odonto', icon: 'fas fa-tooth', meta: 10, realizado: 6 },
+          { nome: 'Check-Up', icon: 'fas fa-stethoscope', meta: 50, realizado: 35 },
+          { nome: 'Dr Central', icon: 'fas fa-user-md', meta: 20, realizado: 15 }
+        ],
+        ultimos7Dias: 0,
+        mesAnterior: 0
+      };
+      
+      console.log('Dados do colaborador processados:', this.dadosColaborador);
+    },
+
     async carregarColaboradoresComMetas() {
       this.carregandoColaboradores = true;
       try {

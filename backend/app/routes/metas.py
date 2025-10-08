@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List
 from app.database import get_db
-# Importações corrigidas para usar o model e schema de METAS
+from app.dependencies import get_current_user
 from app.models.metas_colaboradores import MetaColaborador
 from app.schemas.metas import MetaColaborador as MetaColaboradorSchema
 
@@ -12,6 +12,40 @@ router = APIRouter(
     prefix="/metas",  # Prefixo corrigido para /metas
     tags=["Metas"]
 )
+
+@router.get("/minha-meta", response_model=List[MetaColaboradorSchema])
+def get_minha_meta(current_user = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Retorna as metas do funcionário associado ao usuário logado.
+    """
+    print(f"--- [ROTA METAS] Buscando metas para usuário: {current_user.username} (id_funcionario: {current_user.id_funcionario}) ---")
+    
+    if not current_user.id_funcionario:
+        print(f"--- [ROTA METAS] Usuário {current_user.username} não tem funcionário associado ---")
+        raise HTTPException(status_code=404, detail="Usuário não tem funcionário associado")
+    
+    # Buscar funcionário pelo ID
+    from app.models.funcionario import Funcionario
+    funcionario = db.query(Funcionario).filter(Funcionario.id == current_user.id_funcionario).first()
+    
+    if not funcionario:
+        print(f"--- [ROTA METAS] Funcionário com ID {current_user.id_funcionario} não encontrado ---")
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    
+    if not funcionario.cpf:
+        print(f"--- [ROTA METAS] Funcionário {funcionario.nome} não possui CPF cadastrado ---")
+        raise HTTPException(status_code=404, detail="Funcionário não possui CPF cadastrado")
+    
+    # Buscar metas do funcionário pelo CPF
+    metas = db.query(MetaColaborador).filter(MetaColaborador.cpf == funcionario.cpf).all()
+    
+    if not metas:
+        print(f"--- [ROTA METAS] Nenhuma meta encontrada para o funcionário {funcionario.nome} (CPF: {funcionario.cpf}) ---")
+        raise HTTPException(status_code=404, detail="Nenhuma meta encontrada para este funcionário")
+    
+    print(f"--- [ROTA METAS] Encontradas {len(metas)} metas para {funcionario.nome}. Retornando 200 OK. ---")
+    return metas
+
 
 @router.get("/colaboradores-com-metas")
 def get_colaboradores_com_metas(db: Session = Depends(get_db)):

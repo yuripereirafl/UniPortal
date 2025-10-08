@@ -2,9 +2,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.user import User
+from app.models.usuario import Usuario as User
 from app.models.grupos import Grupo
-from app.models.permissoes import Permissao
+from app.models.permissao import Permissao
 from app.models.usuario_grupo import usuario_grupo
 from jose import jwt, JWTError
 from app.config import settings
