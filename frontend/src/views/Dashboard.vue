@@ -82,7 +82,6 @@
           <i class="fas fa-bullseye menu-icon"></i>
           <span class="menu-text">Meta Colaborador</span>
         </button>
-
         
         <button
           v-if="$auth && ($auth.hasPermission('adm'))"
@@ -162,7 +161,6 @@ import GruposPasta from './GruposPasta.vue';
 import Cargos from './Cargos.vue';
 import QuadroColaboradores from '../components/QuadroColaboradores.vue';
 import MetaColaborador from '../components/MetaColaborador.vue';
-
 import { API_BASE_URL } from '@/api.js';
 
 export default {

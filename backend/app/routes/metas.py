@@ -18,60 +18,56 @@ def get_colaboradores_com_metas(db: Session = Depends(get_db)):
     """
     Retorna lista de todos os colaboradores que possuem metas cadastradas.
     """
-    print("--- [ROTA METAS] Buscando todos os colaboradores com metas (OTIMIZADO) ---")
+    print("--- [ROTA METAS] Buscando todos os colaboradores com metas ---")
     
-    # Busca otimizada: uma única query com window function para pegar o registro mais recente por id_eyal
-    from sqlalchemy import func, and_
-    from sqlalchemy.orm import aliased
+    # Buscar colaboradores distintos que têm metas usando uma abordagem diferente
+    # Primeiro, vamos buscar todos os id_eyal únicos
+    ids_eyal_unicos = db.query(MetaColaborador.id_eyal)\
+        .filter(MetaColaborador.id_eyal.isnot(None))\
+        .distinct()\
+        .all()
     
-    # Subquery para encontrar o mes_ref mais recente para cada id_eyal
-    subq = db.query(
-        MetaColaborador.id_eyal,
-        func.max(MetaColaborador.mes_ref).label('max_mes_ref')
-    ).filter(
-        MetaColaborador.id_eyal.isnot(None)
-    ).group_by(MetaColaborador.id_eyal).subquery()
+    print(f"--- [ROTA METAS] Encontrados {len(ids_eyal_unicos)} id_eyal únicos ---")
     
-    # Query principal que junta com a subquery para pegar apenas os registros mais recentes
-    colaboradores_query = db.query(MetaColaborador).join(
-        subq,
-        and_(
-            MetaColaborador.id_eyal == subq.c.id_eyal,
-            MetaColaborador.mes_ref == subq.c.max_mes_ref
-        )
-    ).all()
-    
-    print(f"--- [ROTA METAS] Processados {len(colaboradores_query)} colaboradores únicos (OTIMIZADO) ---")
-    
-    # Processa os resultados
+    # Agora buscar um registro para cada id_eyal único (o mais recente)
     resultado = []
-    for meta in colaboradores_query:
-        colaborador = {
-            "id": meta.cpf,  # Usando CPF como ID
-            "cpf": meta.cpf,
-            "nome": meta.nome,
-            "cargo": meta.cargo,
-            "unidade": meta.unidade,
-            "equipe": meta.equipe,
-            "lider_direto": meta.lider_direto,
-            "nivel": meta.nivel,
-            "funcao": meta.funcao,
-            "meta_total": meta.meta_final,
-            "meta_diaria": meta.meta_diaria,
-            "dias_trabalhados": meta.dias_trabalhados,
-            "dias_de_falta": meta.dias_de_falta,
-            "mes_ref": meta.mes_ref,
-            "id_eyal": meta.id_eyal
-        }
-        
-        # Log específico para debug de dados vazios
-        if not meta.cargo or not meta.unidade:
-            print(f"--- [DEBUG] Colaborador {meta.nome} (CPF: {meta.cpf}) tem dados incompletos:")
-            print(f"    Cargo: '{meta.cargo}' | Unidade: '{meta.unidade}' | Equipe: '{meta.equipe}'")
-        
-        resultado.append(colaborador)
+    colaboradores_processados = set()  # Para evitar duplicatas
     
-    print(f"--- [ROTA METAS] Processados {len(resultado)} colaboradores únicos (OTIMIZADO) ---")
+    for (id_eyal,) in ids_eyal_unicos:
+        # Buscar o registro mais recente para este id_eyal
+        meta = db.query(MetaColaborador)\
+            .filter(MetaColaborador.id_eyal == id_eyal)\
+            .order_by(MetaColaborador.mes_ref.desc())\
+            .first()
+        
+        if meta and meta.cpf not in colaboradores_processados:
+            colaborador = {
+                "id": meta.cpf,  # Usando CPF como ID
+                "cpf": meta.cpf,
+                "nome": meta.nome,
+                "cargo": meta.cargo,
+                "unidade": meta.unidade,
+                "equipe": meta.equipe,
+                "lider_direto": meta.lider_direto,
+                "nivel": meta.nivel,
+                "funcao": meta.funcao,
+                "meta_total": meta.meta_final,
+                "meta_diaria": meta.meta_diaria,
+                "dias_trabalhados": meta.dias_trabalhados,
+                "dias_de_falta": meta.dias_de_falta,
+                "mes_ref": meta.mes_ref,
+                "id_eyal": meta.id_eyal
+            }
+            
+            # Log específico para debug de dados vazios
+            if not meta.cargo or not meta.unidade:
+                print(f"--- [DEBUG] Colaborador {meta.nome} (CPF: {meta.cpf}) tem dados incompletos:")
+                print(f"    Cargo: '{meta.cargo}' | Unidade: '{meta.unidade}' | Equipe: '{meta.equipe}'")
+            
+            resultado.append(colaborador)
+            colaboradores_processados.add(meta.cpf)
+    
+    print(f"--- [ROTA METAS] Processados {len(resultado)} colaboradores únicos ---")
     return resultado
 
 
