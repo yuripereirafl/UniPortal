@@ -722,9 +722,9 @@ export default {
         equipe: meta.equipe,
         metaTotal: meta.meta_final || 0,
         metaDiaria: meta.meta_diaria || 0,
-        totalRealizado: 0, // TODO: buscar dados reais de performance
-        realizadoDia: 0, // TODO: buscar dados reais de performance
-        percentualMeta: 0, // TODO: calcular baseado no realizado
+        totalRealizado: 0, // Será atualizado por carregarDadosRealizado
+        realizadoDia: 0, // Será atualizado por carregarDadosRealizado
+        percentualMeta: 0, // Será calculado baseado no realizado
         nps: '83,33', // Valor padrão
         vendas: {
           odonto: 0,
@@ -747,6 +747,14 @@ export default {
       };
       
       console.log('Dados do colaborador processados:', this.dadosColaborador);
+      
+      // Buscar dados de realizado se tiver id_eyal
+      if (meta.id_eyal) {
+        console.log('Carregando dados de realizado para id_eyal:', meta.id_eyal);
+        await this.carregarDadosRealizado(meta.id_eyal);
+      } else {
+        console.warn('Meta sem id_eyal, não é possível carregar dados de realizado');
+      }
     },
 
     async carregarColaboradoresComMetas() {
