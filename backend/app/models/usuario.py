@@ -8,9 +8,11 @@ usuario_setor = Table(
     Column('setor_id', Integer, ForeignKey('rh_homologacao.setores.id'), primary_key=True),
     schema='rh_homologacao'
 )
+
 from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from ..database import Base
+from .usuario_grupo import usuario_grupo
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -20,3 +22,4 @@ class Usuario(Base):
     hashed_password = Column("hashsenha", String, nullable=False)
     id_funcionario = Column(Integer, nullable=True)
     setores = relationship('Setor', secondary=usuario_setor, backref='usuarios')
+    grupos = relationship('Grupo', secondary=usuario_grupo, back_populates='usuarios', passive_deletes=True)
