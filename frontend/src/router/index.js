@@ -27,6 +27,7 @@ const routes = [
   { path: '/login', component: Login },
   { path: '/cadastro-usuario', component: CadastroUsuario },
   { path: '/', component: Dashboard },
+
   { path: '/cadastro', component: Cadastro },
   { path: '/sistemas', component: Sistemas },
   { path: '/funcionarios', component: Funcionarios },

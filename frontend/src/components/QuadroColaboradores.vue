@@ -1,11 +1,86 @@
 <template>
+  <!-- Visão Meta Unidade (quando ativa, esconde o resto) -->
   <VisaoMetaUnidade v-if="mostrarMetaUnidade" @voltar="mostrarMetaUnidade = false" />
-  <div class="dashboard-colaboradores">
+  
+  <!-- Meta Individual do Colaborador (quando ativa, esconde o resto) -->
+  <MetaColaborador v-else-if="mostrarVisaoMeta" :colaboradorPreSelecionado="colaboradorSelecionadoMeta" @voltar="voltarParaQuadro" />
+  
+  <!-- Quadro de Colaboradores (só mostra quando não está em nenhuma visão de meta) -->
+  <div v-else class="dashboard-colaboradores">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
       <h2 style="margin: 0;">Quadro de Colaboradores</h2>
-      <button @click="mostrarMetaUnidade = true" class="btn-action btn-meta-unidade">
-        <i class="fas fa-bullseye"></i> Meta Unidade
-      </button>
+      
+      <!-- Controles do lado direito -->
+      <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+        <!-- Filtro de Pesquisa -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="filtroPesquisa" style="font-weight: 600; color: #374151; display: flex; align-items: center; gap: 5px;">
+            <i class="fas fa-search"></i> Pesquisar:
+          </label>
+          <div style="position: relative;">
+            <input 
+              id="filtroPesquisa"
+              type="text" 
+              v-model="filtroPesquisa" 
+              placeholder="Nome, cargo, função..."
+              style="padding: 8px 35px 8px 12px; border: 2px solid #e5e7eb; border-radius: 6px; background: white; min-width: 180px;"
+            />
+            <button 
+              v-if="filtroPesquisa" 
+              @click="filtroPesquisa = ''" 
+              style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #9ca3af; cursor: pointer; padding: 2px;"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Filtro por Unidade -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="filtroUnidade" style="font-weight: 600; color: #374151; display: flex; align-items: center; gap: 5px;">
+            <i class="fas fa-building"></i> Unidade:
+          </label>
+          <select id="filtroUnidade" v-model="filtroUnidadeSelecionada" style="padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 6px; background: white; min-width: 150px;">
+            <option value="">Todas</option>
+            <option v-for="unidade in unidadesDisponiveis" :key="unidade" :value="unidade">
+              {{ unidade }}
+            </option>
+          </select>
+        </div>
+        
+        <button @click="mostrarMetaUnidade = true" class="btn-action btn-meta-unidade">
+          <i class="fas fa-bullseye"></i> Meta Unidade
+        </button>
+      </div>
+    </div>
+    
+    <!-- Resumo compacto com ícones de status -->
+    <div class="resumo-compacto">
+      <div class="unidade-info">
+        <div class="unidade-titulo">
+          <i class="fas fa-building"></i>
+          <span class="unidade-nome">{{ filtroUnidadeSelecionada || 'Todas as Unidades' }}</span>
+        </div>
+        <div class="total-info">
+          <span class="total-numero">{{ colaboradoresFiltrados.length }}</span>
+          <span class="total-texto">{{ colaboradoresFiltrados.length === 1 ? 'colaborador' : 'colaboradores' }}</span>
+        </div>
+      </div>
+      
+      <div class="status-mini-icons">
+        <div class="mini-status ativo" title="Colaboradores Ativos">
+          <i class="fas fa-circle"></i>
+          <span>{{ colaboradoresAtivos.length }}</span>
+        </div>
+        <div class="mini-status inativo" title="Colaboradores Inativos">
+          <i class="fas fa-circle"></i>
+          <span>{{ colaboradoresInativos.length }}</span>
+        </div>
+        <div class="mini-status meta" title="Com Meta Definida">
+          <i class="fas fa-target"></i>
+          <span>{{ colaboradoresComMeta.length }}</span>
+        </div>
+      </div>
     </div>
     <div v-if="carregando" class="loading-indicator">
       <div class="spinner"></div>
@@ -30,7 +105,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="colab in colaboradoresOrdenados" :key="colab.id">
+        <tr v-for="colab in colaboradoresFiltrados" :key="colab.id">
           <td>{{ colab.nome }}</td>
           <td>{{ colab.sobrenome || '-' }}</td>
           <!-- <td>
@@ -77,7 +152,7 @@
                   ? 'status-inativo'
                   : (colab.data_afastamento
                       ? (colab.data_retorno ? 'status-active' : 'status-afastado')
-                      : (colab.status === 'Ativo' ? 'status-active' : 'status-afastado'))
+                      : ((colab.status && (colab.status.toUpperCase() === 'ATIVO' || colab.status === 'Ativo')) ? 'status-active' : 'status-afastado'))
               ]"
             >
               {{
@@ -90,9 +165,15 @@
             </span>
           </td>
           <td>
-            <span class="meta-value">{{ colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-' }}</span>
+            <span class="meta-value">
+              {{ colab.meta_colaborador && colab.meta_colaborador.meta_final !== undefined && colab.meta_colaborador.meta_final !== null ? colab.meta_colaborador.meta_final : 
+                   (colab.meta && colab.meta.calc_meta !== undefined ? colab.meta.calc_meta : '-') }}
+            </span>
           </td>
-          <td>{{ colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-' }}</td>
+          <td>
+            {{ colab.meta_colaborador && colab.meta_colaborador.tipo_pgto ? colab.meta_colaborador.tipo_pgto : 
+               (colab.meta && colab.meta.tipo_pgto ? colab.meta.tipo_pgto : '-') }}
+          </td>
           <td>
             <div class="action-buttons">
               <button @click="editarColaborador(colab)" class="btn-action btn-edit">
@@ -270,6 +351,7 @@
 
 <script>
 import VisaoMeta from './VisaoMeta.vue'
+import MetaColaborador from './MetaColaborador.vue'
 import VisaoMetaUnidade from './VisaoMetaUnidade.vue'
 import { API_BASE_URL } from '@/api.js'
 
@@ -277,6 +359,7 @@ export default {
   name: 'QuadroColaboradores',
   components: {
     VisaoMeta,
+    MetaColaborador,
     VisaoMetaUnidade
   },
   props: {
@@ -341,7 +424,9 @@ export default {
       ordenacao: {
         coluna: '',
         asc: true
-      }
+      },
+      filtroUnidadeSelecionada: '',
+      filtroPesquisa: '',
     }
   },
   mounted() {
@@ -386,6 +471,76 @@ export default {
         });
       }
       return lista;
+    },
+    unidadesDisponiveis() {
+      const unidades = new Set();
+      this.colaboradoresLista.forEach(colab => {
+        if (colab.setores && colab.setores.length > 0) {
+          colab.setores.forEach(setor => {
+            if (setor.nome) {
+              unidades.add(setor.nome.trim());
+            }
+          });
+        }
+      });
+      return Array.from(unidades).sort();
+    },
+    colaboradoresFiltrados() {
+      let lista = [...this.colaboradoresOrdenados];
+      
+      // Filtro por unidade
+      if (this.filtroUnidadeSelecionada) {
+        lista = lista.filter(colab => {
+          return colab.setores && colab.setores.some(setor => 
+            setor.nome && setor.nome.trim() === this.filtroUnidadeSelecionada
+          );
+        });
+      }
+      
+      // Filtro por pesquisa
+      if (this.filtroPesquisa) {
+        const termo = this.filtroPesquisa.toLowerCase().trim();
+        lista = lista.filter(colab => {
+          const nome = (colab.nome || '').toLowerCase();
+          const sobrenome = (colab.sobrenome || '').toLowerCase();
+          const cargo = (colab.cargo && colab.cargo.nome) ? colab.cargo.nome.toLowerCase() : '';
+          const funcao = (colab.cargo && colab.cargo.funcao) ? colab.cargo.funcao.toLowerCase() : '';
+          const equipe = (colab.cargo && colab.cargo.equipe) ? colab.cargo.equipe.toLowerCase() : '';
+          
+          return nome.includes(termo) || 
+                 sobrenome.includes(termo) || 
+                 cargo.includes(termo) || 
+                 funcao.includes(termo) || 
+                 equipe.includes(termo);
+        });
+      }
+      
+      return lista;
+    },
+    
+    // Propriedades computadas para o contador melhorado
+    colaboradoresAtivos() {
+      return this.colaboradoresFiltrados.filter(colab => {
+        // Considera ativo se não tem data de inativação e não está afastado sem retorno
+        return !colab.data_inativado && 
+               (!colab.data_afastamento || colab.data_retorno);
+      });
+    },
+    
+    colaboradoresInativos() {
+      return this.colaboradoresFiltrados.filter(colab => {
+        // Considera inativo se tem data de inativação ou está afastado sem retorno
+        return colab.data_inativado || 
+               (colab.data_afastamento && !colab.data_retorno);
+      });
+    },
+    
+    colaboradoresComMeta() {
+      return this.colaboradoresFiltrados.filter(colab => {
+        return colab.meta_colaborador && 
+               colab.meta_colaborador.meta_final !== null && 
+               colab.meta_colaborador.meta_final !== undefined;
+      });
     }
   },
   methods: {
@@ -504,7 +659,12 @@ export default {
     
     // Métodos para a visão de meta
     abrirVisaoMeta(colaborador) {
-      console.log('Abrindo visão de meta para:', colaborador);
+      console.log('=== ABRINDO VISÃO META ===');
+      console.log('Colaborador clicado:', colaborador);
+      console.log('ID do colaborador:', colaborador.id);
+      console.log('CPF do colaborador:', colaborador.cpf);
+      console.log('Nome do colaborador:', colaborador.nome);
+      
       this.colaboradorSelecionadoMeta = colaborador;
       this.mostrarVisaoMeta = true;
     },
@@ -728,6 +888,9 @@ export default {
 </script>
 
 <style scoped>
+/* Import Font Awesome se não estiver já incluído */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+
 /* Spinner para loading */
 .loading-indicator {
   display: flex;
@@ -749,8 +912,6 @@ export default {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-/* Import Font Awesome se não estiver já incluído */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 
 .dashboard-colaboradores {
   padding: 24px;
@@ -926,6 +1087,253 @@ export default {
   border: 1px solid #e2e8f0;
 }
 
+/* Filtro de Unidade */
+.filtro-unidade-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+}
+
+.filtro-unidade-container label {
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.filtro-unidade-container select {
+  padding: 10px 15px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+  min-width: 200px;
+  transition: all 0.3s ease;
+}
+
+.filtro-unidade-container select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Resumo de Colaboradores Moderno */
+.resumo-colaboradores {
+  margin: 20px 0;
+}
+
+.resumo-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.resumo-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.resumo-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.resumo-icone {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.resumo-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.resumo-total {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.resumo-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.stat-item.ativo {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #10b981;
+}
+
+.stat-item.inativo {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #ef4444;
+}
+
+.stat-item.meta {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 1px solid #0ea5e9;
+}
+
+.stat-icone {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.stat-item.ativo .stat-icone {
+  background: #10b981;
+  color: white;
+}
+
+.stat-item.inativo .stat-icone {
+  background: #ef4444;
+  color: white;
+}
+
+.stat-item.meta .stat-icone {
+  background: #0ea5e9;
+  color: white;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat-numero {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.stat-item.ativo .stat-numero {
+  color: #065f46;
+}
+
+.stat-item.inativo .stat-numero {
+  color: #991b1b;
+}
+
+.stat-item.meta .stat-numero {
+  color: #0c4a6e;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  opacity: 0.8;
+}
+
+/* Responsividade do Resumo */
+@media (max-width: 768px) {
+  .resumo-colaboradores {
+    margin: 16px 0;
+  }
+  
+  .resumo-card {
+    padding: 16px;
+  }
+  
+  .resumo-header {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .resumo-icone {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+  
+  .resumo-info h3 {
+    font-size: 1.1rem;
+  }
+  
+  .resumo-stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .stat-item {
+    padding: 10px;
+    gap: 10px;
+  }
+  
+  .stat-icone {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  
+  .stat-numero {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .resumo-header {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+  
+  .stat-item {
+    justify-content: space-between;
+  }
+  
+  .stat-info {
+    align-items: flex-end;
+    text-align: right;
+  }
+}
+
 .modern-table {
   width: 100%;
   border-collapse: collapse;
@@ -1086,9 +1494,9 @@ export default {
 }
 
 .status-active {
-  background: #bbf7d0; /* Sólido */
-  color: #166534;
-  border: 1px solid #4ade80;
+  background: #10b981; /* Verde mais vibrante */
+  color: #ffffff; /* Texto branco para melhor contraste */
+  border: 1px solid #059669;
 }
 
 .status-afastado {
@@ -1604,6 +2012,29 @@ export default {
   .total-display {
     align-self: center;
   }
+  
+  /* Responsividade para novos controles */
+  .dashboard-colaboradores > div:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+  }
+  
+  .dashboard-colaboradores > div:first-child > div:last-child {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  .dashboard-colaboradores > div:first-child > div:last-child > div:first-child {
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: stretch !important;
+  }
+  
+  .dashboard-colaboradores > div:first-child > div:last-child > div:first-child select {
+    min-width: auto !important;
+    width: 100% !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1619,6 +2050,170 @@ export default {
   .total-display {
     padding: 10px 14px;
     font-size: 13px;
+  }
+}
+
+/* Estilos para o Resumo Compacto */
+.resumo-compacto {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.resumo-compacto:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.unidade-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.unidade-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.unidade-titulo i {
+  color: #3b82f6;
+  font-size: 16px;
+}
+
+.unidade-nome {
+  font-size: 16px;
+}
+
+.total-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.total-numero {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.total-texto {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.status-mini-icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mini-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.mini-status:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.mini-status.ativo {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
+  border: 1px solid #10b981;
+}
+
+.mini-status.ativo i {
+  color: #10b981;
+}
+
+.mini-status.inativo {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+  border: 1px solid #ef4444;
+}
+
+.mini-status.inativo i {
+  color: #ef4444;
+}
+
+.mini-status.meta {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.mini-status.meta i {
+  color: #f59e0b;
+}
+
+.mini-status i {
+  font-size: 10px;
+}
+
+.mini-status span {
+  font-weight: 700;
+}
+
+/* Responsividade para o novo layout */
+@media (max-width: 768px) {
+  .resumo-compacto {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .status-mini-icons {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .mini-status {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .unidade-titulo {
+    justify-content: center;
+  }
+  
+  .total-info {
+    justify-content: center;
+  }
+  
+  .total-numero {
+    font-size: 20px;
+  }
+  
+  .mini-status {
+    min-width: 70px;
+    justify-content: center;
   }
 }
 </style>

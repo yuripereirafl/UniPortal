@@ -83,7 +83,7 @@
               </div>
               <span class="kpi-label">Meta Total</span>
             </div>
-            <div class="kpi-value">{{ dadosUnidade.metaTotal || 0 }}</div>
+            <div class="kpi-value">{{ formatarMoeda(dadosUnidade.metaTotal) }}</div>
             <div class="kpi-progress">
               <div class="progress-bar">
                 <div class="progress-fill meta-progress" :style="{ width: '100%' }"></div>
@@ -98,7 +98,7 @@
               </div>
               <span class="kpi-label">Total Realizado</span>
             </div>
-            <div class="kpi-value">{{ dadosUnidade.totalRealizado || 0 }}</div>
+            <div class="kpi-value">{{ formatarMoeda(dadosUnidade.totalRealizado) }}</div>
             <div class="kpi-progress">
               <div class="progress-bar">
                 <div class="progress-fill realizado-progress" :style="{ width: percentualTotalRealizado + '%' }"></div>
@@ -136,50 +136,104 @@
               <div class="ranking-icon">
                 <i class="fas fa-tooth"></i>
               </div>
-              <h4>Odonto</h4>
-              <span class="total-categoria">Total: {{ totaisPorCategoria.odonto || 0 }}</span>
+              <h4>Top Odonto</h4>
+              <div class="categoria-stats">
+                <span class="quantidade">{{ rankingOdonto.length }} procedimentos</span>
+                <span class="total-categoria">Total: {{ formatarMoeda(totaisPorCategoria.odonto) }}</span>
+              </div>
             </div>
             <div class="ranking-list">
               <div v-for="(item, index) in rankingOdonto" :key="index" class="ranking-item">
-                <span class="posicao">{{ index + 1 }}º</span>
-                <span class="nome">{{ item.nome }}</span>
-                <span class="valor">{{ item.valor }}</span>
+                <span class="posicao">{{ item.posicao || (index + 1) }}º</span>
+                <div class="vendedor-info">
+                  <span class="nome-vendedor">{{ item.nome }}</span>
+                  <span class="unidade-vendedor">{{ item.unidade }}</span>
+                  <div class="stats-vendedor">
+                    <span class="quantidade">{{ item.quantidade || 0 }} procedimentos</span>
+                    <span class="valor">{{ item.valor_formatado || formatarMoeda(item.valor) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Ranking Check-Up -->
-          <div class="ranking-card checkup">
+          <!-- Ranking Exames -->
+          <div class="ranking-card exames">
+            <div class="ranking-header">
+              <div class="ranking-icon">
+                <i class="fas fa-vials"></i>
+              </div>
+              <h4>Top Exames</h4>
+              <div class="categoria-stats">
+                <span class="quantidade">{{ rankingExames.length }} procedimentos</span>
+                <span class="total-categoria">Total: {{ formatarMoeda(totaisPorCategoria.exames) }}</span>
+              </div>
+            </div>
+            <div class="ranking-list">
+              <div v-for="(item, index) in rankingExames" :key="index" class="ranking-item">
+                <span class="posicao">{{ item.posicao || (index + 1) }}º</span>
+                <div class="vendedor-info">
+                  <span class="nome-vendedor">{{ item.nome }}</span>
+                  <span class="unidade-vendedor">{{ item.unidade }}</span>
+                  <div class="stats-vendedor">
+                    <span class="quantidade">{{ item.quantidade || 0 }} exames</span>
+                    <span class="valor">{{ item.valor_formatado || formatarMoeda(item.valor) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ranking Consultas -->
+          <div class="ranking-card consultas">
             <div class="ranking-header">
               <div class="ranking-icon">
                 <i class="fas fa-stethoscope"></i>
               </div>
-              <h4>Check-Up</h4>
-              <span class="total-categoria">Total: {{ totaisPorCategoria.checkup || 0 }}</span>
+              <h4>Top Consultas</h4>
+              <div class="categoria-stats">
+                <span class="quantidade">{{ rankingConsultas.length }} procedimentos</span>
+                <span class="total-categoria">Total: {{ formatarMoeda(totaisPorCategoria.consultas) }}</span>
+              </div>
             </div>
             <div class="ranking-list">
-              <div v-for="(item, index) in rankingCheckup" :key="index" class="ranking-item">
-                <span class="posicao">{{ index + 1 }}º</span>
-                <span class="nome">{{ item.nome }}</span>
-                <span class="valor">{{ item.valor }}</span>
+              <div v-for="(item, index) in rankingConsultas" :key="index" class="ranking-item">
+                <span class="posicao">{{ item.posicao || (index + 1) }}º</span>
+                <div class="vendedor-info">
+                  <span class="nome-vendedor">{{ item.nome }}</span>
+                  <span class="unidade-vendedor">{{ item.unidade }}</span>
+                  <div class="stats-vendedor">
+                    <span class="quantidade">{{ item.quantidade || 0 }} consultas</span>
+                    <span class="valor">{{ item.valor_formatado || formatarMoeda(item.valor) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Ranking Dr. Central -->
-          <div class="ranking-card drcentral">
+          <!-- Ranking Checkups -->
+          <div class="ranking-card checkups">
             <div class="ranking-header">
               <div class="ranking-icon">
-                <i class="fas fa-user-md"></i>
+                <i class="fas fa-heart-pulse"></i>
               </div>
-              <h4>Dr. Central</h4>
-              <span class="total-categoria">Total: {{ totaisPorCategoria.drCentral || 0 }}</span>
+              <h4>Top Checkups</h4>
+              <div class="categoria-stats">
+                <span class="quantidade">{{ rankingCheckup.length }} procedimentos</span>
+                <span class="total-categoria">Total: {{ formatarMoeda(totaisPorCategoria.checkup) }}</span>
+              </div>
             </div>
             <div class="ranking-list">
-              <div v-for="(item, index) in rankingDrCentral" :key="index" class="ranking-item">
-                <span class="posicao">{{ index + 1 }}º</span>
-                <span class="nome">{{ item.nome }}</span>
-                <span class="valor">{{ item.valor }}</span>
+              <div v-for="(item, index) in rankingCheckup" :key="index" class="ranking-item">
+                <span class="posicao">{{ item.posicao || (index + 1) }}º</span>
+                <div class="vendedor-info">
+                  <span class="nome-vendedor">{{ item.nome }}</span>
+                  <span class="unidade-vendedor">{{ item.unidade }}</span>
+                  <div class="stats-vendedor">
+                    <span class="quantidade">{{ item.quantidade || 0 }} checkups</span>
+                    <span class="valor">{{ item.valor_formatado || formatarMoeda(item.valor) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -259,7 +313,7 @@ export default {
     return {
       carregando: false,
       unidadeSelecionada: '',
-      dataFiltro: new Date().toISOString().slice(0, 7), // Formato YYYY-MM
+      dataFiltro: '2025-09', // Formato YYYY-MM - setembro onde há dados
       
       // Dados da unidade
       dadosUnidade: {
@@ -278,6 +332,8 @@ export default {
       
       // Rankings
       rankingOdonto: [],
+      rankingExames: [],
+      rankingConsultas: [],
       rankingCheckup: [],
       rankingDrCentral: [],
       rankingBabyclick: [],
@@ -285,6 +341,8 @@ export default {
       // Totais por categoria
       totaisPorCategoria: {
         odonto: 0,
+        exames: 0,
+        consultas: 0,
         checkup: 0,
         drCentral: 0,
         babyclick: 0
@@ -333,67 +391,244 @@ export default {
     async carregarDadosUnidade() {
       this.carregando = true;
       try {
-        // Simular carregamento - aqui você faria a chamada real para a API
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Buscar dados reais da API usando setembro (onde há dados disponíveis)
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/dashboard?mes_ref=2025-09`);
         
-        // Dados simulados - substitua pela chamada real da API
-        this.dadosUnidade = {
-          totalColaboradores: 45,
-          metaTotal: 2250,
-          totalRealizado: 1890
-        };
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        }
         
-        // Rankings simulados
-        this.rankingOdonto = [
-          { nome: 'Maria Silva', valor: 85 },
-          { nome: 'João Santos', valor: 78 },
-          { nome: 'Ana Costa', valor: 72 },
-          { nome: 'Pedro Lima', valor: 68 },
-          { nome: 'Carla Rocha', valor: 65 }
-        ];
+        const data = await response.json();
+        console.log('Dados reais recebidos da API:', data);
         
-        this.rankingCheckup = [
-          { nome: 'Roberto Alves', valor: 92 },
-          { nome: 'Lucia Mendes', valor: 88 },
-          { nome: 'Carlos Dias', valor: 82 },
-          { nome: 'Isabel Moura', valor: 79 },
-          { nome: 'Fernando Cruz', valor: 76 }
-        ];
+        // Atualizar dados da unidade com dados reais
+        if (data.resumo) {
+          this.dadosUnidade = {
+            totalColaboradores: data.resumo.total_colaboradores || 0,
+            metaTotal: data.resumo.meta_total || 0,
+            totalRealizado: data.resumo.realizado_total || 0
+          };
+          
+          // Atualizar totais por categoria com dados reais da API
+          if (data.resumo.totais_por_categoria) {
+            this.totaisPorCategoria = {
+              odonto: data.resumo.totais_por_categoria.odonto.valor,
+              exames: data.resumo.totais_por_categoria.exames.valor,
+              consultas: data.resumo.totais_por_categoria.consultas.valor
+            };
+          }
+        }
         
-        this.rankingDrCentral = [
-          { nome: 'Dr. André Silva', valor: 95 },
-          { nome: 'Dra. Beatriz Costa', valor: 89 },
-          { nome: 'Dr. Carlos Mendes', valor: 84 },
-          { nome: 'Dra. Diana Rocha', valor: 80 },
-          { nome: 'Dr. Eduardo Lima', valor: 77 }
-        ];
+        // Buscar unidades disponíveis da API real
+        if (data.unidades && data.unidades.length > 0) {
+          const unidadesUnicas = [...new Set(data.unidades.map(u => u.unidade))];
+          this.unidades = unidadesUnicas.map((nome, index) => ({
+            id: index + 1,
+            nome: nome
+          }));
+        }
         
-        this.rankingBabyclick = [
-          { nome: 'Juliana Oliveira', valor: 88 },
-          { nome: 'Marcos Pereira', valor: 82 },
-          { nome: 'Leticia Santos', valor: 78 },
-          { nome: 'Gabriel Costa', valor: 74 },
-          { nome: 'Camila Silva', valor: 71 }
-        ];
-        
-        // Totais por categoria
-        this.totaisPorCategoria = {
-          odonto: 368,
-          checkup: 415,
-          drCentral: 421,
-          babyclick: 393
-        };
+        // Carregar rankings reais
+        await this.carregarRankings();
         
       } catch (error) {
         console.error('Erro ao carregar dados da unidade:', error);
+        
+        // Em caso de erro, usar dados padrão
+        this.dadosUnidade = {
+          totalColaboradores: 0,
+          metaTotal: 0,
+          totalRealizado: 0
+        };
       } finally {
         this.carregando = false;
       }
     },
     
-    atualizarDados() {
+    async atualizarDados() {
       console.log('Atualizando dados para unidade:', this.unidadeSelecionada, 'período:', this.dataFiltro);
-      this.carregarDadosUnidade();
+      this.carregando = true;
+      
+      try {
+        // Construir URL com filtros para dados reais
+        let url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/dashboard`;
+        const params = new URLSearchParams();
+        
+        if (this.dataFiltro) {
+          params.append('mes_ref', this.dataFiltro);
+        } else {
+          // Se não houver filtro de data, usar setembro onde há dados
+          params.append('mes_ref', '2025-09');
+        }
+        
+        if (params.toString()) {
+          url += '?' + params.toString();
+        }
+        
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Dados atualizados da API real:', data);
+          
+          // Atualizar dados da unidade
+          if (data.resumo) {
+            this.dadosUnidade = {
+              totalColaboradores: data.resumo.total_unidades || 0,
+              metaTotal: data.resumo.meta_total || 0,
+              totalRealizado: data.resumo.realizado_total || 0
+            };
+          }
+          
+          // Se uma unidade específica foi selecionada, filtrar os dados
+          if (this.unidadeSelecionada && data.unidades) {
+            const unidadeNome = this.unidades.find(u => u.id == this.unidadeSelecionada)?.nome;
+            const unidadeData = data.unidades.find(u => u.unidade === unidadeNome);
+            
+            if (unidadeData) {
+              this.dadosUnidade = {
+                totalColaboradores: 1, // Uma unidade específica
+                metaTotal: unidadeData.meta || 0,
+                totalRealizado: unidadeData.realizado || 0
+              };
+            }
+          }
+          
+          // Atualizar unidades disponíveis
+          if (data.unidades && data.unidades.length > 0) {
+            const unidadesUnicas = [...new Set(data.unidades.map(u => u.unidade))];
+            this.unidades = unidadesUnicas.map((nome, index) => ({
+              id: index + 1,
+              nome: nome
+            }));
+          }
+          
+          // Carregar rankings após atualizar dados
+          await this.carregarRankings();
+          
+        } else {
+          console.error('Erro na resposta da API:', response.status, response.statusText);
+          await this.carregarDadosUnidade(); // Fallback para dados gerais
+        }
+        
+      } catch (error) {
+        console.error('Erro ao atualizar dados:', error);
+        await this.carregarDadosUnidade(); // Fallback para dados gerais
+      } finally {
+        this.carregando = false;
+      }
+    },
+    
+    async carregarRankings() {
+      try {
+        // Construir URL com filtros para o novo endpoint
+        let url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/rankings-top10?mes_ref=${this.periodoSelecionado}`;
+        
+        // Adicionar filtro de unidade se selecionada
+        if (this.unidadeSelecionada && this.unidadeSelecionada !== 'Todas') {
+          const unidadeNome = this.unidades.find(u => u.id == this.unidadeSelecionada)?.nome;
+          if (unidadeNome) {
+            url += `&unidade=${encodeURIComponent(unidadeNome)}`;
+          }
+        }
+        
+        console.log('🏆 Carregando rankings reais da URL:', url);
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('🏆 Rankings reais recebidos:', data);
+          
+          // Limpar rankings existentes
+          this.rankingOdonto = [];
+          this.rankingExames = [];
+          this.rankingConsultas = [];
+          this.rankingCheckup = [];
+          
+          // Processar rankings por categoria
+          if (data.rankings && Array.isArray(data.rankings)) {
+            data.rankings.forEach(categoria => {
+              console.log(`🏆 Processando categoria: ${categoria.categoria} (${categoria.vendedores?.length || 0} vendedores)`);
+              
+              switch (categoria.categoria?.toUpperCase()) {
+                case 'ODONTO':
+                  this.rankingOdonto = categoria.vendedores || [];
+                  break;
+                case 'EXAMES':
+                  this.rankingExames = categoria.vendedores || [];
+                  break;
+                case 'CONSULTAS':
+                  this.rankingConsultas = categoria.vendedores || [];
+                  break;
+                case 'CHECKUPS':
+                  this.rankingCheckup = categoria.vendedores || [];
+                  break;
+                default:
+                  console.warn(`🏆 Categoria não reconhecida: ${categoria.categoria}`);
+              }
+            });
+            
+            console.log('🏆 Rankings carregados com dados reais:', {
+              odonto: this.rankingOdonto.length,
+              exames: this.rankingExames.length,
+              consultas: this.rankingConsultas.length,
+              checkups: this.rankingCheckup.length
+            });
+          } else {
+            console.warn('🏆 Nenhum ranking encontrado na resposta');
+          }
+        } else {
+          console.error('🏆 Erro na resposta da API de rankings:', response.status, response.statusText);
+          // Manter rankings vazios em caso de erro
+        }
+        
+      } catch (error) {
+        console.error('🏆 Erro ao carregar rankings:', error);
+        // Manter rankings vazios em caso de erro
+      }
+    },
+    
+    carregarRankingsSimulados() {
+      this.rankingOdonto = [
+        { nome: 'VANESSA SOUZA GUIMARAES', quantidade: 47, valor: 30683.70, unidade: 'DR. FLORES 47' },
+        { nome: 'Maria Silva', quantidade: 35, valor: 25000, unidade: 'CANOAS' },
+        { nome: 'João Santos', quantidade: 28, valor: 22000, unidade: 'CENTRAL DE MARCAÇÕES' },
+        { nome: 'Ana Costa', quantidade: 22, valor: 18500, unidade: 'ASSIS BRASIL 3044' }
+      ];
+      this.rankingExames = [
+        { nome: 'Fernanda Oliveira', quantidade: 52, valor: 35200, unidade: 'ASSIS BRASIL 3044' },
+        { nome: 'Ricardo Pereira', quantidade: 48, valor: 32800, unidade: 'GRAVATAI' },
+        { nome: 'Lucia Santos', quantidade: 41, valor: 28600, unidade: 'CANOAS' },
+        { nome: 'Pedro Lima', quantidade: 38, valor: 26400, unidade: 'DR. FLORES 47' }
+      ];
+      this.rankingConsultas = [
+        { nome: 'Carla Mendes', quantidade: 65, valor: 19500, unidade: 'DR. FLORES 47' },
+        { nome: 'Roberto Silva', quantidade: 58, valor: 17400, unidade: 'CANOAS' },
+        { nome: 'Marina Costa', quantidade: 52, valor: 15600, unidade: 'ASSIS BRASIL 3044' },
+        { nome: 'Antonio Pereira', quantidade: 47, valor: 14100, unidade: 'GRAVATAI' }
+      ];
+        this.rankingCheckup = [
+          { nome: 'Ana Silva', quantidade: 8, valor: 15000, unidade: 'CENTRO DE CURITIBA' },
+          { nome: 'Carlos Santos', quantidade: 6, valor: 12000, unidade: 'GRAVATAI' },
+          { nome: 'Mariana Costa', quantidade: 4, valor: 8000, unidade: 'ASSIS BRASIL 3044' },
+          { nome: 'Felipe Nunes', quantidade: 10, valor: 25000, unidade: 'GRAVATAI' }
+        ];      // Atualizar totais por categoria
+      this.totaisPorCategoria = {
+        odonto: this.rankingOdonto.reduce((sum, item) => sum + item.valor, 0),
+        exames: this.rankingExames.reduce((sum, item) => sum + item.valor, 0),
+        consultas: this.rankingConsultas.reduce((sum, item) => sum + item.valor, 0),
+        checkup: this.rankingCheckup.reduce((sum, item) => sum + item.valor, 0),
+        drCentral: 0,
+        babyclick: 0
+      };
+    },
+    
+    formatarMoeda(valor) {
+      if (typeof valor !== 'number') return 'R$ 0,00';
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(valor);
     }
   }
 };
@@ -726,11 +961,45 @@ export default {
 
 .ranking-header {
   display: flex;
-  align-items: center;
-  gap: 15px;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 20px;
   padding-bottom: 15px;
   border-bottom: 1px solid #e9ecef;
+}
+
+.ranking-header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.ranking-header h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.categoria-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.quantidade {
+  color: #667eea;
+  font-weight: 600;
+  background: rgba(102, 126, 234, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.total-categoria {
+  color: #28a745;
+  font-weight: 700;
 }
 
 .ranking-icon {
@@ -754,6 +1023,18 @@ export default {
 
 .ranking-card.drcentral .ranking-icon {
   background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.ranking-card.exames .ranking-icon {
+  background: linear-gradient(135deg, #17a2b8, #138496);
+}
+
+.ranking-card.consultas .ranking-icon {
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+}
+
+.ranking-card.checkups .ranking-icon {
+  background: linear-gradient(135deg, #dc3545, #c82333);
 }
 
 .ranking-card.babyclick .ranking-icon {
@@ -806,18 +1087,75 @@ export default {
   justify-content: center;
   font-weight: 700;
   font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.colaborador-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .nome {
-  flex: 1;
   font-weight: 600;
   color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+.unidade {
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-weight: 500;
 }
 
 .valor {
   font-weight: 700;
   color: #667eea;
   font-size: 1.1rem;
+}
+
+/* Estilos para vendedores */
+.vendedor-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nome-vendedor {
+  font-weight: 600;
+  font-size: 14px;
+  color: #212529;
+  line-height: 1.2;
+}
+
+.unidade-vendedor {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.stats-vendedor {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.stats-vendedor .quantidade {
+  font-size: 12px;
+  color: #28a745;
+  font-weight: 600;
+  background: rgba(40, 167, 69, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.stats-vendedor .valor {
+  font-weight: 700;
+  font-size: 14px;
+  color: #007bff;
 }
 
 /* Resumo Executivo */

@@ -8,3 +8,4 @@ passlib
 python-multipart
 pandas
 python-dotenv
+bcrypt==3.2.2

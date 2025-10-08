@@ -40,99 +40,64 @@
               <i class="fas fa-medal"></i>
               Top 5 Vendedores do Mês
             </h3>
-            <div class="ranking-lista">
-              <div class="vendedor-item podium primeiro" style="animation-delay: 0.1s">
-                <div class="posicao-badge">1º</div>
+            
+            <!-- Loading state -->
+            <div v-if="carregandoRanking" class="ranking-loading">
+              <div class="spinner"></div>
+              <p>Carregando ranking...</p>
+            </div>
+            
+            <!-- Ranking real -->
+            <div v-else-if="topVendedores.length > 0" class="ranking-lista">
+              <div 
+                v-for="(vendedor, index) in topVendedores" 
+                :key="vendedor.nome"
+                class="vendedor-item"
+                :class="{ 
+                  'podium': index < 3,
+                  'primeiro': index === 0, 
+                  'segundo': index === 1, 
+                  'terceiro': index === 2 
+                }"
+                :style="{ 'animation-delay': (index * 0.1 + 0.1) + 's' }"
+              >
+                <div class="posicao-badge">{{ vendedor.posicao }}º</div>
                 <div class="vendedor-info">
-                  <div class="vendedor-avatar primeiro">
-                    <i class="fas fa-crown"></i>
+                  <div class="vendedor-avatar" :class="{ 
+                    'primeiro': index === 0, 
+                    'segundo': index === 1, 
+                    'terceiro': index === 2 
+                  }">
+                    <i v-if="index === 0" class="fas fa-crown"></i>
+                    <i v-else-if="index === 1" class="fas fa-medal"></i>
+                    <i v-else-if="index === 2" class="fas fa-award"></i>
+                    <span v-else>{{ vendedor.iniciais }}</span>
                   </div>
                   <div class="vendedor-dados">
-                    <h4>Maria Silva Santos</h4>
-                    <p>Vendedora Sênior</p>
+                    <h4>{{ vendedor.nome }}</h4>
+                    <p>{{ vendedor.cargo }}</p>
                     <div class="vendedor-stats">
-                      <span class="vendas">156 vendas</span>
-                      <span class="meta">125% da meta</span>
+                      <span class="vendas">{{ vendedor.total_vendas }} vendas</span>
+                      <span class="meta">{{ vendedor.percentual_meta }}% da meta</span>
                     </div>
                   </div>
                 </div>
-                <div class="premio-badge primeiro">
-                  <i class="fas fa-trophy"></i>
-                  Campeã
+                <div v-if="vendedor.badge" class="premio-badge" :class="{ 
+                  'primeiro': index === 0, 
+                  'segundo': index === 1, 
+                  'terceiro': index === 2 
+                }">
+                  <i v-if="index === 0" class="fas fa-trophy"></i>
+                  <i v-else-if="index === 1" class="fas fa-medal"></i>
+                  <i v-else-if="index === 2" class="fas fa-award"></i>
+                  {{ vendedor.badge }}
                 </div>
               </div>
-
-              <div class="vendedor-item podium segundo" style="animation-delay: 0.2s">
-                <div class="posicao-badge">2º</div>
-                <div class="vendedor-info">
-                  <div class="vendedor-avatar segundo">
-                    <i class="fas fa-medal"></i>
-                  </div>
-                  <div class="vendedor-dados">
-                    <h4>João Carlos Pereira</h4>
-                    <p>Consultor de Vendas</p>
-                    <div class="vendedor-stats">
-                      <span class="vendas">142 vendas</span>
-                      <span class="meta">118% da meta</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="premio-badge segundo">
-                  <i class="fas fa-medal"></i>
-                  Vice
-                </div>
-              </div>
-
-              <div class="vendedor-item podium terceiro" style="animation-delay: 0.3s">
-                <div class="posicao-badge">3º</div>
-                <div class="vendedor-info">
-                  <div class="vendedor-avatar terceiro">
-                    <i class="fas fa-award"></i>
-                  </div>
-                  <div class="vendedor-dados">
-                    <h4>Ana Beatriz Costa</h4>
-                    <p>Supervisora de Vendas</p>
-                    <div class="vendedor-stats">
-                      <span class="vendas">128 vendas</span>
-                      <span class="meta">107% da meta</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="premio-badge terceiro">
-                  <i class="fas fa-award"></i>
-                  Bronze
-                </div>
-              </div>
-
-              <div class="vendedor-item" style="animation-delay: 0.4s">
-                <div class="posicao-badge">4º</div>
-                <div class="vendedor-info">
-                  <div class="vendedor-avatar">PL</div>
-                  <div class="vendedor-dados">
-                    <h4>Pedro Henrique Lima</h4>
-                    <p>Vendedor Pleno</p>
-                    <div class="vendedor-stats">
-                      <span class="vendas">98 vendas</span>
-                      <span class="meta">98% da meta</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="vendedor-item" style="animation-delay: 0.5s">
-                <div class="posicao-badge">5º</div>
-                <div class="vendedor-info">
-                  <div class="vendedor-avatar">CR</div>
-                  <div class="vendedor-dados">
-                    <h4>Carla Fernanda Rocha</h4>
-                    <p>Consultora Especializada</p>
-                    <div class="vendedor-stats">
-                      <span class="vendas">87 vendas</span>
-                      <span class="meta">92% da meta</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            </div>
+            
+            <!-- Estado vazio -->
+            <div v-else class="ranking-vazio">
+              <p>Não há dados de vendas disponíveis para este mês.</p>
             </div>
           </div>
 
@@ -146,15 +111,15 @@
               <p>Cada venda conta para o sucesso da equipe. Vamos juntos alcançar novos patamares!</p>
               <div class="stats-gerais">
                 <div class="stat-item">
-                  <span class="numero">2.847</span>
+                  <span class="numero">{{ formatarMoedaRanking(estatisticasGerais.vendas_totais) }}</span>
                   <span class="label">Vendas este mês</span>
                 </div>
                 <div class="stat-item">
-                  <span class="numero">98.5%</span>
+                  <span class="numero">{{ estatisticasGerais.percentual_meta_equipe }}%</span>
                   <span class="label">Meta da equipe</span>
                 </div>
                 <div class="stat-item">
-                  <span class="numero">R$ 847k</span>
+                  <span class="numero">R$ {{ formatarMoedaRanking(estatisticasGerais.faturamento_total / 1000) }}k</span>
                   <span class="label">Faturamento</span>
                 </div>
               </div>
@@ -181,12 +146,14 @@
           <div class="header-title">
             <h1>
               <i class="fas fa-user-chart header-icon"></i>
-              Meta Individual dos Colaboradores
+              <span v-if="modoUsuarioLogado">Minha Meta Individual</span>
+              <span v-else-if="colaboradorPreSelecionado">Meta de {{ colaboradorPreSelecionado.nome }}</span>
+              <span v-else>Meta Individual dos Colaboradores</span>
             </h1>
           </div>
         </div>
         <div class="header-right">
-          <div class="controls-group">
+          <div class="controls-group" v-if="!colaboradorPreSelecionado && !modoUsuarioLogado">
             <div class="filter-control">
               <label>
                 <i class="fas fa-user"></i>
@@ -220,8 +187,8 @@
       <p>Carregando meta do colaborador...</p>
     </div>
 
-    <!-- Seleção de Colaborador -->
-    <div v-else-if="!colaboradorSelecionado" class="selecao-colaborador">
+    <!-- Seleção de Colaborador (só mostra se não há colaborador pré-selecionado e não está no modo usuário logado) -->
+    <div v-else-if="!colaboradorSelecionado && !colaboradorPreSelecionado && !modoUsuarioLogado" class="selecao-colaborador">
       <div class="instrucao-card">
         <div class="instrucao-icon">
           <i class="fas fa-hand-point-up"></i>
@@ -516,6 +483,7 @@
 </template>
 
 <script>
+import axios from 'axios'
 import { API_BASE_URL } from '@/api.js'
 
 export default {
@@ -524,6 +492,10 @@ export default {
     colaboradores: {
       type: Array,
       default: () => []
+    },
+    colaboradorPreSelecionado: {
+      type: Object,
+      default: null
     }
   },
   data() {
@@ -534,7 +506,17 @@ export default {
       colaboradoresProcessados: [],
       dadosColaborador: {},
       mostrarRanking: true, // Modal de ranking aparece primeiro
-      error: null
+      error: null,
+      modoUsuarioLogado: false, // Controla se deve mostrar apenas a meta do usuário logado
+      // Dados reais do ranking
+      topVendedores: [],
+      estatisticasGerais: {
+        vendas_totais: 0,
+        faturamento_total: 0,
+        percentual_meta_equipe: 0,
+        vendedores_ativos: 0
+      },
+      carregandoRanking: true
     };
   },
   computed: {
@@ -608,13 +590,165 @@ export default {
       handler(newColaboradores) {
         this.processarColaboradores(newColaboradores);
       }
+    },
+    colaboradorPreSelecionado: {
+      immediate: true,
+      handler(novoColaborador) {
+        if (novoColaborador && novoColaborador.cpf) {
+          console.log('Watcher: Configurando colaborador por CPF:', novoColaborador.cpf);
+          this.colaboradorSelecionado = novoColaborador.cpf;
+          
+          // Carrega a meta do colaborador se os dados já estão disponíveis
+          if (this.colaboradoresProcessados.length > 0) {
+            this.carregarMetaColaborador();
+          }
+        }
+      }
     }
   },
   mounted() {
+    // Verificar se deve mostrar apenas a meta do usuário logado
+    this.verificarModoUsuarioLogado();
+    
     // Carrega colaboradores com metas diretamente da API ao invés de depender das props
     this.carregarColaboradoresComMetas();
+    
+    // Carregar dados reais do ranking
+    this.carregarRankingReal();
+    
+    // Se foi passado um colaborador pré-selecionado, configura automaticamente
+    if (this.colaboradorPreSelecionado) {
+      console.log('Colaborador pré-selecionado recebido:', this.colaboradorPreSelecionado);
+      
+      // SEMPRE usa CPF quando disponível, pois é o padrão da API de metas
+      const idColaborador = this.colaboradorPreSelecionado.cpf;
+      console.log('CPF do colaborador que será usado:', idColaborador);
+      
+      if (idColaborador) {
+        this.colaboradorSelecionado = idColaborador;
+        
+        // Carrega a meta do colaborador após um pequeno delay para garantir que os dados estejam carregados
+        setTimeout(() => {
+          console.log('Carregando meta do colaborador...');
+          this.carregarMetaColaborador();
+        }, 500);
+      } else {
+        console.warn('Colaborador pré-selecionado não tem CPF disponível:', this.colaboradorPreSelecionado);
+      }
+    }
   },
   methods: {
+    verificarModoUsuarioLogado() {
+      try {
+        const auth = this.$auth;
+        if (auth && typeof auth.getCurrentUser === 'function' && typeof auth.hasPermission === 'function') {
+          const user = auth.getCurrentUser();
+          const temPermissaoMeta = auth.hasPermission('meta_colaborador');
+          const temPermissaoAdmin = auth.hasPermission('adm');
+          const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
+          const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
+
+          // Se tem permissão meta_colaborador mas NÃO tem permissões administrativas,
+          // deve ver apenas sua própria meta
+          this.modoUsuarioLogado = temPermissaoMeta && !temPermissaoAdmin && !temPermissaoEditarColaborador && !temPermissaoEditarUsuario;
+          
+          if (this.modoUsuarioLogado) {
+            console.log('Modo usuário logado ativado - usuário tem apenas permissão meta_colaborador');
+            // Pular o ranking e carregar diretamente a meta
+            this.mostrarRanking = false;
+            
+            // Verificar se o usuário tem funcionário associado
+            if (user && user.funcionario && user.funcionario.cpf) {
+              console.log('Usuário tem funcionário associado:', user.funcionario);
+              // Auto-selecionar o colaborador baseado no CPF do funcionário
+              this.colaboradorSelecionado = user.funcionario.cpf;
+              // Carregar a meta do usuário usando o endpoint específico
+              this.carregarMinhaMetaIndividual();
+            } else {
+              console.warn('Usuário tem permissão meta_colaborador mas não tem funcionário associado');
+              this.error = 'Seu usuário não está associado a um funcionário. Entre em contato com o administrador.';
+              this.carregando = false;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao verificar modo usuário logado:', error);
+        this.modoUsuarioLogado = false;
+      }
+    },
+
+    async carregarMinhaMetaIndividual() {
+      this.carregando = true;
+      this.error = null;
+      
+      try {
+        console.log('Carregando minha meta individual...');
+        const response = await axios.get('/metas/minha-meta');
+        
+        console.log('Minha meta carregada:', response.data);
+        
+        if (response.data && response.data.length > 0) {
+          // Pegar a meta mais recente (ordenar por mes_ref decrescente)
+          const metaAtual = response.data.sort((a, b) => {
+            if (a.mes_ref > b.mes_ref) return -1;
+            if (a.mes_ref < b.mes_ref) return 1;
+            return 0;
+          })[0];
+          
+          // Processar dados da meta para o formato esperado pelo componente
+          await this.processarDadosMetaIndividual(metaAtual);
+        } else {
+          this.error = 'Nenhuma meta encontrada para seu perfil.';
+        }
+      } catch (error) {
+        console.error('Erro ao carregar minha meta:', error);
+        if (error.response && error.response.status === 404) {
+          const errorData = error.response.data;
+          this.error = errorData.detail || 'Nenhuma meta encontrada para seu perfil.';
+        } else {
+          this.error = 'Erro ao carregar sua meta. Tente novamente.';
+        }
+      } finally {
+        this.carregando = false;
+      }
+    },
+
+    async processarDadosMetaIndividual(meta) {
+      // Adaptar os dados da meta para o formato esperado pelo componente
+      this.dadosColaborador = {
+        nome: meta.nome,
+        cargo: meta.cargo,
+        unidade: meta.unidade,
+        equipe: meta.equipe,
+        metaTotal: meta.meta_final || 0,
+        metaDiaria: meta.meta_diaria || 0,
+        totalRealizado: 0, // TODO: buscar dados reais de performance
+        realizadoDia: 0, // TODO: buscar dados reais de performance
+        percentualMeta: 0, // TODO: calcular baseado no realizado
+        nps: '83,33', // Valor padrão
+        vendas: {
+          odonto: 0,
+          babyClick: 0,
+          checkUp: 0,
+          drCentral: 0,
+          orcamentos: 0
+        },
+        comissao: {
+          projecaoMeta: 0,
+          campanhas: 0
+        },
+        categorias: [
+          { nome: 'Odonto', icon: 'fas fa-tooth', meta: 10, realizado: 6 },
+          { nome: 'Check-Up', icon: 'fas fa-stethoscope', meta: 50, realizado: 35 },
+          { nome: 'Dr Central', icon: 'fas fa-user-md', meta: 20, realizado: 15 }
+        ],
+        ultimos7Dias: 0,
+        mesAnterior: 0
+      };
+      
+      console.log('Dados do colaborador processados:', this.dadosColaborador);
+    },
+
     async carregarColaboradoresComMetas() {
       this.carregandoColaboradores = true;
       try {
@@ -674,19 +808,50 @@ export default {
     fecharRanking() {
       this.mostrarRanking = false;
     },
+
+    async carregarRankingReal() {
+      this.carregandoRanking = true;
+      try {
+        // Carregar top vendedores
+        const responseRanking = await fetch(`${API_BASE_URL}/ranking/top-vendedores?mes_ref=2025-09-01&limit=5`);
+        if (responseRanking.ok) {
+          const dataRanking = await responseRanking.json();
+          if (dataRanking.success) {
+            this.topVendedores = dataRanking.data;
+          }
+        }
+
+        // Carregar estatísticas gerais
+        const responseStats = await fetch(`${API_BASE_URL}/ranking/estatisticas-gerais?mes_ref=2025-09-01`);
+        if (responseStats.ok) {
+          const dataStats = await responseStats.json();
+          if (dataStats.success) {
+            this.estatisticasGerais = dataStats.data;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar ranking:', error);
+      } finally {
+        this.carregandoRanking = false;
+      }
+    },
+
+    formatarMoedaRanking(valor) {
+      return new Intl.NumberFormat('pt-BR').format(valor);
+    },
     
     processarColaboradores(colaboradores) {
-      console.log('Processando colaboradores:', colaboradores);
+      console.log('=== PROCESSANDO COLABORADORES ===');
+      console.log('Quantidade de colaboradores recebidos:', colaboradores?.length || 0);
       
       if (!colaboradores || colaboradores.length === 0) {
+        console.log('Nenhum colaborador para processar');
         this.colaboradoresProcessados = [];
         return;
       }
 
       // Processar dados dos colaboradores
       this.colaboradoresProcessados = colaboradores.map(colab => {
-        console.log('Processando colaborador:', colab);
-        
         // Extrair informações do cargo
         let cargoInfo = 'Cargo não definido';
         if (colab.cargo) {
@@ -726,7 +891,17 @@ export default {
         };
       });
 
-      console.log('Colaboradores processados:', this.colaboradoresProcessados);
+      console.log('=== RESULTADO DO PROCESSAMENTO ===');
+      console.log(`Processados ${this.colaboradoresProcessados.length} colaboradores`);
+      console.log('Primeiros 5 CPFs/IDs:', this.colaboradoresProcessados.slice(0, 5).map(c => ({ id: c.id, nome: c.nome })));
+      
+      // Se temos um colaborador pré-selecionado, tenta carregar sua meta agora
+      if (this.colaboradorPreSelecionado && this.colaboradorPreSelecionado.cpf && this.colaboradorSelecionado) {
+        console.log('Tentando carregar meta do colaborador pré-selecionado...');
+        setTimeout(() => {
+          this.carregarMetaColaborador();
+        }, 100);
+      }
     },
 
     getUnidadeFromSetores(setores) {
@@ -755,8 +930,28 @@ export default {
         this.carregando = true;
         this.error = null;
         
-        const colaborador = this.colaboradoresProcessados.find(c => c.id == this.colaboradorSelecionado);
+        console.log('=== DEBUG CARREGAR META ===');
+        console.log('colaboradorSelecionado (CPF esperado):', this.colaboradorSelecionado);
+        console.log('colaboradoresProcessados:', this.colaboradoresProcessados);
+        console.log('colaboradoresProcessados.length:', this.colaboradoresProcessados.length);
+        
+        // Busca colaborador SEMPRE por CPF (que é o padrão da API de metas)
+        let colaborador = this.colaboradoresProcessados.find(c => c.id === this.colaboradorSelecionado);
+        
+        // Se não encontrou e temos um colaborador pré-selecionado, tenta buscar usando o CPF dele diretamente
+        if (!colaborador && this.colaboradorPreSelecionado && this.colaboradorPreSelecionado.cpf) {
+          colaborador = this.colaboradoresProcessados.find(c => c.id === this.colaboradorPreSelecionado.cpf);
+        }
+        
+        console.log('Colaborador encontrado:', colaborador);
+        
         if (!colaborador) {
+          console.log('ERRO: Colaborador não encontrado na lista de colaboradores processados');
+          console.log('CPFs/IDs disponíveis:', this.colaboradoresProcessados.map(c => ({ id: c.id, nome: c.nome, cpf: c.cpf })));
+          console.log('Tentando buscar por CPF:', this.colaboradorSelecionado);
+          if (this.colaboradorPreSelecionado) {
+            console.log('Colaborador pré-selecionado CPF:', this.colaboradorPreSelecionado.cpf);
+          }
           this.error = 'Colaborador não encontrado.';
           this.dadosColaborador = {};
           return;
@@ -1133,6 +1328,35 @@ export default {
 </script>
 
 <style scoped>
+/* Loading do Ranking */
+.ranking-loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.ranking-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.ranking-vazio {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-style: italic;
+}
+
 .meta-colaborador {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

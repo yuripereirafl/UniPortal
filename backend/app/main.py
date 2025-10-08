@@ -33,6 +33,9 @@ from app.routes.permissoes import router as permissoes_router
 from app.routes.metas import router as metas_router
 from app.routes.realizado import router as realizado_router
 from app.routes.performance import router as performance_router # NOVO 
+from app.routes.metas_unidades import router as metas_unidades_router
+from app.routes.metas_unidades_real import router as metas_unidades_real_router 
+from app.routes.ranking import router as ranking_router 
 
 # --- INICIALIZAÇÃO DA APLICAÇÃO ---
 app = FastAPI(
@@ -44,12 +47,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # Permitir origin específica do frontend na VM e manter regex para outros ambientes locais
-    allow_origins=["http://192.168.1.37:8080"],
+    allow_origins=["http://192.168.1.5:8080", "http://192.168.1.32:8080", "http://192.168.1.32:8081", "http://localhost:8080", "http://localhost:8081", "http://127.0.0.1:8080", "http://127.0.0.1:8081"],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+),
 
 # --- INCLUSÃO DE TODOS OS ROUTERS NA APLICAÇÃO ---
 # (Mantendo os seus routers existentes)
@@ -71,6 +74,9 @@ app.include_router(permissoes_router)
 app.include_router(metas_router)
 app.include_router(realizado_router)
 app.include_router(performance_router) # NOVO
+app.include_router(metas_unidades_router, prefix="/metas-unidades", tags=["Metas das Unidades"])
+app.include_router(metas_unidades_real_router, prefix="/metas-unidades-real", tags=["Dashboard Unidades Real"])
+app.include_router(ranking_router, prefix="/ranking", tags=["Ranking de Vendedores"])
 
 # --- OS SEUS ENDPOINTS DE DASHBOARD (MANTIDOS INTACTOS) ---
 @app.get("/dashboard/totais")

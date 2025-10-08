@@ -82,6 +82,7 @@
           <i class="fas fa-bullseye menu-icon"></i>
           <span class="menu-text">Meta Colaborador</span>
         </button>
+
         
         <button
           v-if="$auth && ($auth.hasPermission('adm'))"
@@ -143,7 +144,7 @@
     <!-- Conteúdo Principal -->
     <main class="main-content" :class="{ expanded: isCollapsed }">
       <component :is="panelComponent" v-if="activePanel !== 'quadroColaboradores' && activePanel !== 'metaColaborador'" />
-  <QuadroColaboradores v-else-if="activePanel === 'quadroColaboradores'" :colaboradores="funcionarios" />
+      <QuadroColaboradores v-else-if="activePanel === 'quadroColaboradores'" :colaboradores="funcionarios" />
       <MetaColaborador v-else-if="activePanel === 'metaColaborador'" :colaboradores="funcionarios" />
     </main>
   </div>
@@ -161,6 +162,7 @@ import GruposPasta from './GruposPasta.vue';
 import Cargos from './Cargos.vue';
 import QuadroColaboradores from '../components/QuadroColaboradores.vue';
 import MetaColaborador from '../components/MetaColaborador.vue';
+
 import { API_BASE_URL } from '@/api.js';
 
 export default {
@@ -216,26 +218,39 @@ export default {
       try {
         const auth = this.$auth;
         if (auth && typeof auth.hasPermission === 'function') {
-          if (auth.hasPermission('adm')) {
+          // Verificar permissões específicas
+          const temPermissaoMeta = auth.hasPermission('meta_colaborador');
+          const temPermissaoAdmin = auth.hasPermission('adm');
+          const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
+          const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
+
+          // Se tem permissão admin, pode ver tudo
+          if (temPermissaoAdmin) {
             this.activePanel = 'dashboard';
             return;
           }
-          if (auth.hasPermission('meta_colaborador')) {
+
+          // Se tem permissão de meta_colaborador (e não é admin), vai para meta individual
+          if (temPermissaoMeta) {
+            console.log('Usuário tem permissão meta_colaborador - direcionando para sua meta individual');
             this.activePanel = 'metaColaborador';
             return;
           }
-          if (auth.hasPermission('adm') || auth.hasPermission('editar_usuario')) {
+
+          // Se tem permissão para editar usuários
+          if (temPermissaoEditarUsuario) {
             this.activePanel = 'usuarios';
             return;
           }
-          // garantir que não abrimos funcionários sem permissão específica
-          if (auth.hasPermission('editar_colaborador') || auth.hasPermission('adm')) {
+
+          // Se tem permissão para editar colaboradores
+          if (temPermissaoEditarColaborador) {
             this.activePanel = 'funcionarios';
             return;
           }
         }
-        // Se nenhum dos casos acima, evitar abrir o painel 'dashboard' por padrão
-        // escolhemos 'metaColaborador' como fallback visual mais seguro
+        
+        // Se nenhum dos casos acima, fallback seguro
         this.activePanel = 'metaColaborador';
       } catch (e) {
         this.activePanel = 'metaColaborador';

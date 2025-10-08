@@ -4,10 +4,10 @@ set -euo pipefail
 # deploy.sh (versão simples, sem backups)
 # Atualiza/clona a branch indicada e sobe o stack via docker compose
 # Uso: ./deploy.sh [branch] [use_compose]
-#  branch: nome da branch a clonar/atualizar (padrão: Portal_atual)
+#  branch: nome da branch a clonar/atualizar (padrão: main)
 #  use_compose: "true"|"false" - quando true (padrão) o script define DB_HOST=db no .env
 
-BRANCH=${1:-Portal_atual}
+BRANCH=${1:-main}
 USE_COMPOSE=${2:-true}
 TARGET_DIR="${HOME}/System_ti-main"
 REPO_URL="https://github.com/yuripereirafl/UniPortal.git"
