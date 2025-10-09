@@ -283,7 +283,7 @@
             </div>
             <span class="kpi-titulo">NPS/CSAT</span>
           </div>
-          <div class="kpi-valor">{{ dadosColaborador.nps || '83,33' }}</div>
+          <div class="kpi-valor">{{ dadosColaborador.nps || 0 }}</div>
           <div class="kpi-sublabel">Satisfação</div>
         </div>
       </div>
@@ -293,13 +293,16 @@
         <h3 class="section-title">
           <i class="fas fa-shopping-cart"></i>
           VENDAS
+          <span class="vendas-fonte" title="Dados reais da tabela basecampanhas" style="font-size: 0.7em; color: #4caf50; margin-left: 8px;">
+            <i class="fas fa-database"></i>
+          </span>
         </h3>
         <div class="vendas-grid">
           <div class="venda-card">
             <div class="venda-header">
               <span class="venda-label">Odonto</span>
             </div>
-            <div class="venda-valor">{{ dadosColaborador.vendas?.odonto || 6 }}</div>
+            <div class="venda-valor">{{ dadosColaborador.vendas?.odonto || 0 }}</div>
           </div>
           <div class="venda-card">
             <div class="venda-header">
@@ -311,19 +314,19 @@
             <div class="venda-header">
               <span class="venda-label">Check-Up</span>
             </div>
-            <div class="venda-valor">{{ dadosColaborador.vendas?.checkUp || 35 }}</div>
+            <div class="venda-valor">{{ dadosColaborador.vendas?.checkUp || 0 }}</div>
           </div>
           <div class="venda-card">
             <div class="venda-header">
               <span class="venda-label">Dr Central</span>
             </div>
-            <div class="venda-valor">{{ dadosColaborador.vendas?.drCentral || 15 }}</div>
+            <div class="venda-valor">{{ dadosColaborador.vendas?.drCentral || 0 }}</div>
           </div>
           <div class="venda-card">
             <div class="venda-header">
               <span class="venda-label">Orçamentos</span>
             </div>
-            <div class="venda-valor">{{ dadosColaborador.vendas?.orcamentos || 63 }}</div>
+            <div class="venda-valor">{{ dadosColaborador.vendas?.orcamentos || 0 }}</div>
           </div>
         </div>
       </div>
@@ -353,11 +356,11 @@
           <div class="detalhes-grid">
             <div class="detalhe-item">
               <div class="detalhe-label">Projeção da Meta Realizada</div>
-              <div class="detalhe-valor">{{ formatarMoeda(dadosColaborador.comissao?.projecaoMeta || 77) }}</div>
+              <div class="detalhe-valor">{{ formatarMoeda(dadosColaborador.comissao?.projecaoMeta || 0) }}</div>
             </div>
             <div class="detalhe-item">
               <div class="detalhe-label">Campanhas</div>
-              <div class="detalhe-valor">{{ formatarMoeda(dadosColaborador.comissao?.campanhas || 100) }}</div>
+              <div class="detalhe-valor">{{ formatarMoeda(dadosColaborador.comissao?.campanhas || 0) }}</div>
             </div>
           </div>
         </div>
@@ -371,17 +374,19 @@
         </h3>
         <div class="projecoes-grid">
           <div class="projecao-card">
-            <div class="projecao-label">Atingimento Projetado</div>
-            <div class="projecao-valor">{{ calcularAtingimentoProjetado() }}%</div>
+            <div class="projecao-label">Atingimento Atual</div>
+            <div class="projecao-valor">{{ (dadosColaborador.percentualMeta || 0).toFixed(2) }}%</div>
+            <div class="projecao-info">Até o momento</div>
           </div>
           <div class="projecao-card">
             <div class="projecao-label">Realizado Projetado</div>
             <div class="projecao-valor">{{ formatarMoeda(calcularRealizadoProjetado()) }}</div>
+            <div class="projecao-info">Estimativa fim do mês</div>
           </div>
         </div>
       </div>
 
-      <!-- Barra de Progresso Geral -->
+      <!-- Barra de Progresso Geral
       <div class="progress-geral">
         <div class="progress-header">
           <h3>Progresso da Meta Geral</h3>
@@ -397,8 +402,8 @@
           </div>
         </div>
       </div>
-
-      <!-- Performance por Categoria -->
+-->
+      <!-- Performance por Categoria
       <div class="categorias-performance">
         <h3 class="section-title">
           <i class="fas fa-chart-pie"></i>
@@ -447,7 +452,7 @@
           </div>
         </div>
       </div>
-
+        -->
       <!-- Histórico e Tendências -->
       <div class="historico-tendencias">
         <h3 class="section-title">
@@ -1138,17 +1143,24 @@ export default {
     
     async carregarDadosRealizado(idEyal) {
       try {
-        // ✅ CRÍTICO: Passar mes_ref para garantir que realizado seja do MESMO mês da meta
+        // 🚀 NOVO: Usar tabela painelresultadosdiarios com regras já aplicadas
         const params = this.mesSelecionado ? `?mes_ref=${this.mesSelecionado}` : '';
-        const url = `${API_BASE_URL}/realizado/colaborador/${idEyal}/resumo${params}`;
+        const url = `${API_BASE_URL}/realizado/painel/${idEyal}${params}`;
         
-        console.log('Carregando realizado com URL:', url);
-        console.log('Mês de referência usado:', this.mesSelecionado || 'Mais recente (auto)');
+        console.log('🔄 Carregando realizado da tabela painelresultadosdiarios:', url);
+        console.log('📅 Mês de referência:', this.mesSelecionado || 'Mais recente (auto)');
         
         const response = await fetch(url);
         
         if (response.ok) {
-          const dadosRealizado = await response.json();
+          const resultado = await response.json();
+          console.log('✅ Dados recebidos do painel:', resultado);
+          
+          // Extrair dados da nova estrutura
+          const dadosRealizado = {
+            TOTAL_GERAL: resultado.realizado?.realizado_final || 0,
+            MES_REF: resultado.realizado?.mes_referencia || this.mesSelecionado
+          };
           console.log('Dados de realizado:', dadosRealizado);
           
           // ✅ Verificar se o mês do realizado corresponde ao mês da meta
@@ -1171,20 +1183,17 @@ export default {
             ? Math.round((totalRealizado / diasDecorridos) * 100) / 100
             : 0;
 
-          // Atualiza dados de vendas baseados no realizado (simulação inteligente)
-          const baseVendas = Math.floor(totalRealizado / 1000); // Aproximação baseada no realizado
-          this.dadosColaborador.vendas = {
-            odonto: Math.max(1, Math.floor(baseVendas * 0.1)),
-            babyClick: Math.floor(baseVendas * 0.05),
-            checkUp: Math.max(1, Math.floor(baseVendas * 0.6)),
-            orcamentos: Math.max(1, Math.floor(baseVendas * 1.2))
-          };
+          // ✅ NOVO: Buscar vendas REAIS da tabela basecampanhas
+          await this.carregarVendasReais(idEyal);
 
-          // Atualiza comissão baseada na performance
+          // ✅ NOVO: Buscar NPS REAL da tabela resultadocsat
+          await this.carregarNPSReal(idEyal);
+
+          // Atualiza comissão baseada na performance - ZERADO até implementar cálculo real
           const percentualPerformance = this.dadosColaborador.percentualMeta / 100;
           this.dadosColaborador.comissao = {
-            projecaoMeta: Math.round(120 * percentualPerformance),
-            campanhas: Math.round(157 * Math.min(percentualPerformance, 1.2)) // Pode ser até 20% extra
+            projecaoMeta: 0, // TODO: Implementar cálculo real baseado em regras de negócio
+            campanhas: 0 // TODO: Implementar cálculo real baseado em regras de negócio
           };
           
           // Cria categorias baseadas nos dados de realizado
@@ -1248,6 +1257,123 @@ export default {
       } catch (error) {
         console.error('Erro ao carregar dados de realizado:', error);
         // Mantém os valores zerados que já foram definidos
+      }
+    },
+
+    async carregarVendasReais(idEyal) {
+      try {
+        // Converter mes_ref de 'YYYY-MM-DD' para 'YYYY-MM' para a API de vendas
+        let mesRef = null;
+        if (this.mesSelecionado) {
+          // Se mesSelecionado é '2024-09-01', pegar apenas '2024-09'
+          mesRef = this.mesSelecionado.substring(0, 7);
+        } else {
+          // Usar mês atual
+          const hoje = new Date();
+          mesRef = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        const urlVendas = `${API_BASE_URL}/vendas/colaborador/${idEyal}?mes_ref=${mesRef}`;
+        console.log('🛒 Carregando vendas REAIS da basecampanhas:', urlVendas);
+
+        const responseVendas = await fetch(urlVendas);
+
+        if (responseVendas.ok) {
+          const dadosVendas = await responseVendas.json();
+          console.log('✅ Dados de vendas recebidos:', dadosVendas);
+
+          if (dadosVendas.success && dadosVendas.resumo) {
+            // ✅ Usar dados REAIS da tabela basecampanhas
+            this.dadosColaborador.vendas = {
+              odonto: dadosVendas.resumo.odonto || 0,
+              babyClick: dadosVendas.resumo.baby_click || 0,
+              checkUp: dadosVendas.resumo.check_up || 0,
+              drCentral: dadosVendas.resumo.dr_central || 0,
+              orcamentos: dadosVendas.resumo.orcamentos || 0
+            };
+
+            console.log('✅ Vendas REAIS aplicadas:', this.dadosColaborador.vendas);
+            console.log(`   📊 Total de vendas: ${dadosVendas.resumo.total_vendas}`);
+          } else {
+            console.warn('⚠️ Nenhuma venda encontrada na basecampanhas para este período');
+            // Manter valores zerados
+            this.dadosColaborador.vendas = {
+              odonto: 0,
+              babyClick: 0,
+              checkUp: 0,
+              drCentral: 0,
+              orcamentos: 0
+            };
+          }
+        } else {
+          const errorText = await responseVendas.text();
+          console.error('❌ Erro ao buscar vendas:', responseVendas.status, errorText);
+          
+          // Fallback: valores zerados
+          this.dadosColaborador.vendas = {
+            odonto: 0,
+            babyClick: 0,
+            checkUp: 0,
+            drCentral: 0,
+            orcamentos: 0
+          };
+        }
+      } catch (error) {
+        console.error('❌ Exceção ao carregar vendas:', error);
+        
+        // Fallback: valores zerados
+        this.dadosColaborador.vendas = {
+          odonto: 0,
+          babyClick: 0,
+          checkUp: 0,
+          drCentral: 0,
+          orcamentos: 0
+        };
+      }
+    },
+
+    async carregarNPSReal(idEyal) {
+      try {
+        // Converter mes_ref de 'YYYY-MM-DD' para 'YYYY-MM' para a API de NPS
+        let mesRef = null;
+        if (this.mesSelecionado) {
+          mesRef = this.mesSelecionado.substring(0, 7); // '2024-09-01' -> '2024-09'
+        } else {
+          const hoje = new Date();
+          mesRef = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        const urlNPS = `${API_BASE_URL}/nps/colaborador/${idEyal}?mes_ref=${mesRef}`;
+        console.log('⭐ Carregando NPS REAL da resultadocsat:', urlNPS);
+
+        const responseNPS = await fetch(urlNPS);
+
+        if (responseNPS.ok) {
+          const dadosNPS = await responseNPS.json();
+          console.log('✅ Dados de NPS recebidos:', dadosNPS);
+
+          if (dadosNPS.success && dadosNPS.nps_data && dadosNPS.nps_data.nps !== null) {
+            // ✅ Usar NPS REAL da tabela resultadocsat
+            const npsValor = dadosNPS.nps_data.nps;
+            this.dadosColaborador.nps = npsValor.toFixed(2);
+
+            console.log('✅ NPS REAL aplicado:', this.dadosColaborador.nps);
+            console.log(`   📊 Detratores: ${dadosNPS.nps_data.qtd_detrator} (${dadosNPS.nps_data.percentuais.detratores}%)`);
+            console.log(`   😐 Neutros: ${dadosNPS.nps_data.qtd_neutro} (${dadosNPS.nps_data.percentuais.neutros}%)`);
+            console.log(`   😊 Promotores: ${dadosNPS.nps_data.qtd_promotor} (${dadosNPS.nps_data.percentuais.promotores}%)`);
+            console.log(`   📝 Total avaliações: ${dadosNPS.nps_data.qtd_total}`);
+          } else {
+            console.warn('⚠️ Nenhum dado de NPS encontrado para este colaborador/período');
+            this.dadosColaborador.nps = 0;
+          }
+        } else {
+          const errorText = await responseNPS.text();
+          console.error('❌ Erro ao buscar NPS:', responseNPS.status, errorText);
+          this.dadosColaborador.nps = 0;
+        }
+      } catch (error) {
+        console.error('❌ Exceção ao carregar NPS:', error);
+        this.dadosColaborador.nps = 0;
       }
     },
     
@@ -1343,27 +1469,56 @@ export default {
     },
 
     calcularComissaoTotal() {
-      const projecao = this.dadosColaborador.comissao?.projecaoMeta || 120;
-      const campanhas = this.dadosColaborador.comissao?.campanhas || 157;
+      const projecao = this.dadosColaborador.comissao?.projecaoMeta || 0;
+      const campanhas = this.dadosColaborador.comissao?.campanhas || 0;
       return projecao + campanhas;
     },
 
-    calcularAtingimentoProjetado() {
-      const meta = this.dadosColaborador.metaTotal || 1;
-      const realizado = this.dadosColaborador.totalRealizado || 0;
-      const percentual = (realizado / meta) * 100;
-      return Math.round(percentual * 100) / 100;
-    },
-
     calcularRealizadoProjetado() {
-      const diasDecorridos = new Date().getDate();
-      const diasNoMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-      const realizado = this.dadosColaborador.totalRealizado || 0;
+      // Usar o mês de referência dos dados, não o mês atual
+      const mesRef = this.dadosColaborador.mesRef || this.mesSelecionado;
+      if (!mesRef) {
+        // Fallback para cálculo simples se não tiver mês de referência
+        const diasDecorridos = new Date().getDate();
+        const diasNoMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+        const realizado = this.dadosColaborador.totalRealizado || 0;
+        
+        if (diasDecorridos === 0) return 0;
+        
+        const mediaDiaria = realizado / diasDecorridos;
+        return mediaDiaria * diasNoMes;
+      }
       
-      if (diasDecorridos === 0) return 0;
+      const dataRef = new Date(mesRef);
+      const hoje = new Date();
+      const anoRef = dataRef.getFullYear();
+      const mesRefNum = dataRef.getMonth();
+      const ultimoDiaMes = new Date(anoRef, mesRefNum + 1, 0);
+      const diasNoMes = ultimoDiaMes.getDate();
       
-      const mediaDiaria = realizado / diasDecorridos;
-      return mediaDiaria * diasNoMes;
+      // Se o mês de referência já passou, retornar o realizado total (não projeta)
+      if (hoje > ultimoDiaMes) {
+        return this.dadosColaborador.totalRealizado || 0;
+      }
+      
+      // Se é o mês atual, calcular projeção baseada nos dias decorridos
+      const diaHoje = hoje.getDate();
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
+      
+      // Verificar se estamos no mês de referência
+      if (anoAtual === anoRef && mesAtual === mesRefNum) {
+        const diasDecorridos = diaHoje;
+        const realizado = this.dadosColaborador.totalRealizado || 0;
+        
+        if (diasDecorridos === 0) return 0;
+        
+        const mediaDiaria = realizado / diasDecorridos;
+        return mediaDiaria * diasNoMes;
+      }
+      
+      // Se o mês ainda não começou, retornar 0
+      return 0;
     },
 
     // Método para obter ícone específico de cada categoria
@@ -2007,6 +2162,13 @@ export default {
 .projecao-valor {
   font-size: 2.5rem;
   font-weight: 700;
+}
+
+.projecao-info {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
 }
 
 /* KPIs Principais */

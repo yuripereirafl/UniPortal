@@ -37,6 +37,7 @@ from app.routes.metas_unidades import router as metas_unidades_router
 from app.routes.metas_unidades_real import router as metas_unidades_real_router 
 from app.routes.ranking import router as ranking_router
 from app.routes.vendas import router as vendas_router 
+from app.routes.nps import router as nps_router  # ✅ NOVO: NPS/CSAT
 
 # --- INICIALIZAÇÃO DA APLICAÇÃO ---
 app = FastAPI(
@@ -78,6 +79,8 @@ app.include_router(performance_router) # NOVO
 app.include_router(metas_unidades_router, prefix="/metas-unidades", tags=["Metas das Unidades"])
 app.include_router(metas_unidades_real_router, prefix="/metas-unidades-real", tags=["Dashboard Unidades Real"])
 app.include_router(ranking_router, prefix="/ranking", tags=["Ranking de Vendedores"])
+app.include_router(vendas_router)  # ✅ Vendas da basecampanhas
+app.include_router(nps_router)  # ✅ NOVO: NPS/CSAT
 app.include_router(vendas_router)
 
 # --- OS SEUS ENDPOINTS DE DASHBOARD (MANTIDOS INTACTOS) ---
