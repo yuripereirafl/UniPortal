@@ -21,6 +21,32 @@ router = APIRouter(
 )
 
 # ========================================
+# FUNÇÕES AUXILIARES
+# ========================================
+
+def _get_mes_mais_recente(db: Session, id_eyal: int = None) -> str:
+    """
+    Retorna o mês mais recente disponível na tabela realizado_colaborador.
+    Se id_eyal for fornecido, busca o mês mais recente daquele colaborador.
+    """
+    query = db.query(func.max(RealizadoColaborador.mes_ref))
+    
+    if id_eyal:
+        query = query.filter(RealizadoColaborador.id_eyal == id_eyal)
+    
+    mes_mais_recente = query.scalar()
+    
+    if not mes_mais_recente:
+        # Fallback: buscar na tabela de metas
+        query_meta = db.query(func.max(MetaColaborador.mes_ref))
+        if id_eyal:
+            query_meta = query_meta.filter(MetaColaborador.id_eyal == str(id_eyal))
+        mes_mais_recente = query_meta.scalar()
+    
+    return str(mes_mais_recente) if mes_mais_recente else None
+
+
+# ========================================
 # NOVAS ROTAS OTIMIZADAS - PAINEL RESULTADOS
 # ========================================
 
@@ -195,14 +221,28 @@ def get_historico_realizado(
 
 
 @router.get("/colaborador/{identificador}", response_model=List[RealizadoSchema])
-def get_realizado_colaborador(identificador: int, db: Session = Depends(get_db)):
+def get_realizado_colaborador(
+    identificador: int, 
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retorna os dados realizados de um colaborador com base no id_eyal.
+    
+    Args:
+        identificador: ID Eyal do colaborador
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, retorna todos os meses.
     """
-    # A consulta já está correta para buscar todos os registros com .all()
-    realizados = db.query(RealizadoColaborador).filter(
+    query = db.query(RealizadoColaborador).filter(
         RealizadoColaborador.id_eyal == identificador
-    ).all()
+    )
+    
+    # Se mes_ref foi fornecido, filtrar por mês
+    if mes_ref:
+        query = query.filter(RealizadoColaborador.mes_ref == mes_ref)
+    
+    realizados = query.all()
+    
     if not realizados:
         raise HTTPException(status_code=404, detail="Dados de 'realizado' não encontrados para o colaborador.")
 
@@ -210,7 +250,11 @@ def get_realizado_colaborador(identificador: int, db: Session = Depends(get_db))
 
 # Rota principal do realizado com regras de negócio
 @router.get("/resumo/{identificador}")
-def get_resumo_colaborador(identificador: int, db: Session = Depends(get_db)):
+def get_resumo_colaborador(
+    identificador: int, 
+    mes_ref: Optional[str] = None,  # ✅ NOVO PARÂMETRO
+    db: Session = Depends(get_db)
+):
     """
     ROTA PRINCIPAL DO REALIZADO COM REGRAS DE NEGÓCIO
     
@@ -221,12 +265,27 @@ def get_resumo_colaborador(identificador: int, db: Session = Depends(get_db)):
     2. Líderes experientes -> próprio realizado + realizado de toda unidade
     3. Líderes gerais -> próprio realizado + realizado de toda unidade
     4. Senão -> apenas próprio realizado
+    
+    Args:
+        identificador: ID Eyal do colaborador
+        mes_ref: Mês de referência (formato YYYY-MM-DD). Se não informado, usa o mês mais recente.
     """
-    return _aplicar_regras_negocio_realizado(identificador, db)
+    # Se não informou mês, pegar o mais recente
+    if not mes_ref:
+        mes_ref = _get_mes_mais_recente(db, identificador)
+        if not mes_ref:
+            raise HTTPException(status_code=404, detail="Nenhum dado de realizado encontrado")
+    
+    print(f"--- [REALIZADO] Buscando dados para ID {identificador} no mês {mes_ref} ---")
+    return _aplicar_regras_negocio_realizado(identificador, mes_ref, db)
 
 # Rota detalhada para o resumo com regras de liderança (mantida para compatibilidade)
 @router.get("/colaborador/{identificador}/resumo")
-def get_resumo_colaborador_detalhado(identificador: int, db: Session = Depends(get_db)):
+def get_resumo_colaborador_detalhado(
+    identificador: int,
+    mes_ref: Optional[str] = None,  # ✅ NOVO PARÂMETRO
+    db: Session = Depends(get_db)
+):
     """
     ROTA DETALHADA - Retorna um resumo com os totais realizados de um colaborador,
     agrupados por tipo_grupo, e um total geral.
@@ -236,11 +295,22 @@ def get_resumo_colaborador_detalhado(identificador: int, db: Session = Depends(g
     2. Líderes da Central de Marcações (cargos específicos) -> incluir toda unidade  
     3. Líderes gerais -> incluir toda unidade
     4. Senão -> apenas próprio realizado
+    
+    Args:
+        identificador: ID Eyal do colaborador
+        mes_ref: Mês de referência (formato YYYY-MM-DD). Se não informado, usa o mês mais recente.
     """
-    return _aplicar_regras_negocio_realizado(identificador, db)
+    # Se não informou mês, pegar o mais recente
+    if not mes_ref:
+        mes_ref = _get_mes_mais_recente(db, identificador)
+        if not mes_ref:
+            raise HTTPException(status_code=404, detail="Nenhum dado de realizado encontrado")
+    
+    print(f"--- [REALIZADO] Buscando dados para ID {identificador} no mês {mes_ref} ---")
+    return _aplicar_regras_negocio_realizado(identificador, mes_ref, db)
 
 
-def _aplicar_regras_negocio_realizado(identificador: int, db: Session):
+def _aplicar_regras_negocio_realizado(identificador: int, mes_ref: str, db: Session):
     """
     FUNÇÃO CORE - Aplica as regras de negócio para cálculo do realizado
     
@@ -249,17 +319,25 @@ def _aplicar_regras_negocio_realizado(identificador: int, db: Session):
     2. Líderes experientes -> próprio realizado + realizado de toda unidade
     3. Líderes gerais -> próprio realizado + realizado de toda unidade
     4. Senão -> apenas próprio realizado
+    
+    Args:
+        identificador: ID Eyal do colaborador
+        mes_ref: Mês de referência (formato YYYY-MM-DD ou string)
+        db: Sessão do banco de dados
     """
     
-    # Primeiro, verificar se o colaborador é um líder experiente
+    print(f"--- [REALIZADO] Aplicando regras para ID {identificador}, mês {mes_ref} ---")
+    
+    # Buscar meta do colaborador NO MÊS ESPECÍFICO
     meta_colaborador = db.query(MetaColaborador).filter(
-        MetaColaborador.id_eyal == str(identificador)
+        MetaColaborador.id_eyal == str(identificador),
+        MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).first()
     
     if not meta_colaborador:
-        print(f"--- [REALIZADO] Colaborador {identificador} não encontrado nas metas ---")
+        print(f"--- [REALIZADO] Colaborador {identificador} não encontrado nas metas do mês {mes_ref} ---")
         # Se não tem meta, busca apenas o realizado direto
-        return _get_resumo_basico(identificador, db)
+        return _get_resumo_basico(identificador, mes_ref, db)
     
     # Lista de cargos de liderança geral
     cargos_lideranca_geral = [
@@ -286,10 +364,11 @@ def _aplicar_regras_negocio_realizado(identificador: int, db: Session):
     # Verificar se é experiente
     eh_experiente = (meta_colaborador.nivel or '').lower() == 'experiente'
     
-    # Verificar unidade - usar a unidade do realizado, não da meta
+    # Verificar unidade - usar a unidade do realizado NO MÊS, não da meta
     unidade_realizado = None
     realizados_colaborador = db.query(RealizadoColaborador).filter(
-        RealizadoColaborador.id_eyal == identificador
+        RealizadoColaborador.id_eyal == identificador,
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).first()
     
     if realizados_colaborador:
@@ -309,27 +388,36 @@ def _aplicar_regras_negocio_realizado(identificador: int, db: Session):
     if eh_lider_central:
         # CONDIÇÃO ESPECIAL: Cargos específicos (supervisor de atendimento, monitor, orientador) recebem próprio + liderados
         print(f"--- [REALIZADO] Cargo especial ({meta_colaborador.cargo}). Usando regra de liderados ---")
-        return _get_resumo_com_liderados(identificador, meta_colaborador.nome, db)
+        return _get_resumo_com_liderados(identificador, meta_colaborador.nome, mes_ref, db)
     elif eh_lider_geral and eh_experiente:
         # Líderes experientes recebem próprio + unidade
         print(f"--- [REALIZADO] Líder experiente. Usando regra de unidade: {unidade} ---")
-        return _get_resumo_por_unidade(identificador, unidade, db)
+        return _get_resumo_por_unidade(identificador, unidade, mes_ref, db)
     elif eh_lider_geral:
         print(f"--- [REALIZADO] Líder geral. Usando regra de unidade: {unidade} ---")
-        return _get_resumo_por_unidade(identificador, unidade, db)
+        return _get_resumo_por_unidade(identificador, unidade, mes_ref, db)
     else:
         print(f"--- [REALIZADO] Colaborador normal. Usando regra básica ---")
-        return _get_resumo_basico(identificador, db)
+        return _get_resumo_basico(identificador, mes_ref, db)
 
 
-def _get_resumo_por_unidade(identificador: int, unidade: str, db: Session):
-    """Retorna o realizado de todos os colaboradores da mesma unidade baseado na tabela realizado_colaborador"""
+def _get_resumo_por_unidade(identificador: int, unidade: str, mes_ref: str, db: Session):
+    """
+    Retorna o realizado de todos os colaboradores da mesma unidade baseado na tabela realizado_colaborador
     
-    print(f"--- [REALIZADO] Buscando todos da unidade: '{unidade}' ---")
+    Args:
+        identificador: ID Eyal do líder
+        unidade: Nome da unidade
+        mes_ref: Mês de referência
+        db: Sessão do banco de dados
+    """
     
-    # Buscar todos os IDs que têm registros na mesma unidade na tabela realizado_colaborador
+    print(f"--- [REALIZADO] Buscando todos da unidade: '{unidade}' no mês {mes_ref} ---")
+    
+    # Buscar todos os IDs que têm registros na mesma unidade NO MÊS ESPECÍFICO
     colaboradores_unidade = db.query(RealizadoColaborador.id_eyal).filter(
-        RealizadoColaborador.unidade == unidade
+        RealizadoColaborador.unidade == unidade,
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).distinct().all()
     
     # Extrair IDs únicos
@@ -340,14 +428,15 @@ def _get_resumo_por_unidade(identificador: int, unidade: str, db: Session):
     
     if not ids_unidade:
         # Fallback para apenas o colaborador atual
-        return _get_resumo_basico(identificador, db)
+        return _get_resumo_basico(identificador, mes_ref, db)
     
-    # Buscar realizado de todos da unidade
+    # Buscar realizado de todos da unidade NO MÊS ESPECÍFICO
     resumo_por_grupo = db.query(
         RealizadoColaborador.tipo_grupo,
         func.sum(RealizadoColaborador.total_realizado).label("total")
     ).filter(
-        RealizadoColaborador.id_eyal.in_(ids_unidade)
+        RealizadoColaborador.id_eyal.in_(ids_unidade),
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).group_by(
         RealizadoColaborador.tipo_grupo
     ).all()
@@ -358,6 +447,7 @@ def _get_resumo_por_unidade(identificador: int, unidade: str, db: Session):
     resumo_final["INCLUI_UNIDADE"] = True  # Flag para indicar que inclui toda unidade
     resumo_final["QTDE_COLABORADORES_UNIDADE"] = len(ids_unidade)
     resumo_final["UNIDADE"] = unidade
+    resumo_final["MES_REF"] = mes_ref  # ✅ ADICIONAR MÊS NA RESPOSTA
 
     if not resumo_final or total_geral == 0:
         # Fallback para apenas o colaborador atual
@@ -366,13 +456,21 @@ def _get_resumo_por_unidade(identificador: int, unidade: str, db: Session):
     return resumo_final
 
 
-def _get_resumo_basico(identificador: int, db: Session):
-    """Retorna apenas o realizado do próprio colaborador"""
+def _get_resumo_basico(identificador: int, mes_ref: str, db: Session):
+    """
+    Retorna apenas o realizado do próprio colaborador NO MÊS ESPECÍFICO.
+    
+    Args:
+        identificador: ID do colaborador
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD')
+        db: Sessão do banco de dados
+    """
     resumo_por_grupo = db.query(
         RealizadoColaborador.tipo_grupo,
         func.sum(RealizadoColaborador.total_realizado).label("total")
     ).filter(
-        RealizadoColaborador.id_eyal == identificador
+        RealizadoColaborador.id_eyal == identificador,
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).group_by(
         RealizadoColaborador.tipo_grupo
     ).all()
@@ -380,6 +478,7 @@ def _get_resumo_basico(identificador: int, db: Session):
     resumo_final = {item.tipo_grupo: item.total for item in resumo_por_grupo}
     total_geral = sum(resumo_final.values())
     resumo_final["TOTAL_GERAL"] = total_geral
+    resumo_final["MES_REF"] = mes_ref  # ✅ ADICIONAR MÊS NA RESPOSTA
 
     if not resumo_final:
         raise HTTPException(status_code=404, detail="Dados não encontrados.")
@@ -387,15 +486,24 @@ def _get_resumo_basico(identificador: int, db: Session):
     return resumo_final
 
 
-def _get_resumo_com_liderados(identificador: int, nome_lider: str, db: Session):
-    """Retorna o realizado do líder + realizado dos liderados"""
+def _get_resumo_com_liderados(identificador: int, nome_lider: str, mes_ref: str, db: Session):
+    """
+    Retorna o realizado do líder + realizado dos liderados NO MÊS ESPECÍFICO.
     
-    # 1. Buscar todos os liderados diretos
+    Args:
+        identificador: ID do colaborador líder
+        nome_lider: Nome do líder direto
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD')
+        db: Sessão do banco de dados
+    """
+    
+    # 1. Buscar todos os liderados diretos NO MÊS ESPECÍFICO
     liderados = db.query(MetaColaborador).filter(
-        MetaColaborador.lider_direto == nome_lider
+        MetaColaborador.lider_direto == nome_lider,
+        MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).all()
     
-    print(f"--- [REALIZADO] Encontrados {len(liderados)} liderados para {nome_lider} ---")
+    print(f"--- [REALIZADO] Encontrados {len(liderados)} liderados para {nome_lider} no mês {mes_ref} ---")
     
     # 2. Lista de IDs para buscar (líder + liderados)
     ids_para_buscar = [identificador]  # Inclui o próprio líder
@@ -405,14 +513,15 @@ def _get_resumo_com_liderados(identificador: int, nome_lider: str, db: Session):
             ids_para_buscar.append(int(liderado.id_eyal))
             print(f"    Liderado: {liderado.nome} (ID: {liderado.id_eyal})")
     
-    print(f"--- [REALIZADO] Buscando realizado para IDs: {ids_para_buscar} ---")
+    print(f"--- [REALIZADO] Buscando realizado para IDs: {ids_para_buscar} no mês {mes_ref} ---")
     
-    # 3. Buscar realizado de todos (líder + liderados)
+    # 3. Buscar realizado de todos (líder + liderados) NO MÊS ESPECÍFICO
     resumo_por_grupo = db.query(
         RealizadoColaborador.tipo_grupo,
         func.sum(RealizadoColaborador.total_realizado).label("total")
     ).filter(
-        RealizadoColaborador.id_eyal.in_(ids_para_buscar)
+        RealizadoColaborador.id_eyal.in_(ids_para_buscar),
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).group_by(
         RealizadoColaborador.tipo_grupo
     ).all()
@@ -422,6 +531,7 @@ def _get_resumo_com_liderados(identificador: int, nome_lider: str, db: Session):
     resumo_final["TOTAL_GERAL"] = total_geral
     resumo_final["INCLUI_LIDERADOS"] = True  # Flag para indicar que inclui liderados
     resumo_final["QTDE_LIDERADOS"] = len(liderados)
+    resumo_final["MES_REF"] = mes_ref  # ✅ ADICIONAR MÊS NA RESPOSTA
 
     if not resumo_final or total_geral == 0:
         raise HTTPException(status_code=404, detail="Dados não encontrados.")
@@ -431,12 +541,23 @@ def _get_resumo_com_liderados(identificador: int, nome_lider: str, db: Session):
 
 # Rota original mantida para compatibilidade
 @router.get("/colaborador/{identificador}/resumo-original")
-def get_resumo_colaborador_original(identificador: int, db: Session = Depends(get_db)):
+def get_resumo_colaborador_original(
+    identificador: int, 
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retorna um resumo com os totais realizados APENAS do colaborador,
     sem aplicar regras de liderança (rota original).
+    
+    Args:
+        identificador: ID do colaborador
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, usa o mês mais recente.
     """
-    return _get_resumo_basico(identificador, db)
+    if not mes_ref:
+        mes_ref = _get_mes_mais_recente(db, identificador)
+    
+    return _get_resumo_basico(identificador, mes_ref, db)
 
 # 1. Crie um novo Schema para a resposta da nova rota.
 #    Isso define como será o JSON de saída.
@@ -449,16 +570,33 @@ class RealizadoUnidadeSchema(BaseModel):
 
 # 2. Adicione a nova rota ao seu router existente.
 @router.get("/unidade", response_model=List[RealizadoUnidadeSchema])
-def get_realizado_por_unidade(db: Session = Depends(get_db)):
+def get_realizado_por_unidade(
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retorna a soma do total realizado para todos os colaboradores,
-    agrupado por unidade.
+    agrupado por unidade NO MÊS ESPECÍFICO.
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, usa o mês mais recente.
     """
-    # A query com SQLAlchemy para agrupar por 'unidade' e somar 'total_realizado'
-    # Removemos o filtro por 'id_eyal' para incluir todos os colaboradores.
+    # Auto-detectar mês mais recente se não fornecido
+    if not mes_ref:
+        mes_recente = db.query(RealizadoColaborador.mes_ref).order_by(
+            RealizadoColaborador.mes_ref.desc()
+        ).first()
+        if mes_recente:
+            mes_ref = mes_recente.mes_ref
+        else:
+            raise HTTPException(status_code=404, detail="Nenhum mês de referência encontrado")
+    
+    # A query com SQLAlchemy para agrupar por 'unidade' e somar 'total_realizado' NO MÊS ESPECÍFICO
     realizado_agrupado = db.query(
         RealizadoColaborador.unidade,
         func.sum(RealizadoColaborador.total_realizado).label("total_realizado")
+    ).filter(
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).group_by(
         RealizadoColaborador.unidade
     ).order_by(
@@ -473,35 +611,59 @@ def get_realizado_por_unidade(db: Session = Depends(get_db)):
     return realizado_agrupado
 
 @router.get("/unidade/{nome_unidade}", response_model=RealizadoUnidadeSchema)
-def get_realizado_por_unidade_especifica(nome_unidade: str, db: Session = Depends(get_db)):
+def get_realizado_por_unidade_especifica(
+    nome_unidade: str, 
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retorna a SOMA do total realizado para todos os colaboradores
-    de UMA unidade específica.
+    de UMA unidade específica NO MÊS ESPECÍFICO.
+    
+    Args:
+        nome_unidade: Nome da unidade
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, usa o mês mais recente.
     """
-    # 1. A query agora soma 'total_realizado' e filtra pela unidade.
-    #    O .scalar() pega o resultado único da soma.
+    # Auto-detectar mês mais recente se não fornecido
+    if not mes_ref:
+        mes_recente = db.query(RealizadoColaborador.mes_ref).order_by(
+            RealizadoColaborador.mes_ref.desc()
+        ).first()
+        if mes_recente:
+            mes_ref = mes_recente.mes_ref
+        else:
+            raise HTTPException(status_code=404, detail="Nenhum mês de referência encontrado")
+    
+    # A query agora soma 'total_realizado' e filtra pela unidade E MÊS ESPECÍFICO
     soma_total = db.query(
         func.sum(RealizadoColaborador.total_realizado)
     ).filter(
-        RealizadoColaborador.unidade == nome_unidade
+        RealizadoColaborador.unidade == nome_unidade,
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).scalar()
 
-    # 2. Se a unidade não existir ou não tiver registros, a soma será None.
+    # Se a unidade não existir ou não tiver registros, a soma será None.
     if soma_total is None:
         raise HTTPException(
             status_code=404, 
-            detail=f"Nenhum dado de 'realizado' encontrado para a unidade: {nome_unidade}"
+            detail=f"Nenhum dado de 'realizado' encontrado para a unidade: {nome_unidade} no mês {mes_ref}"
         )
 
-    # 3. Retorna um dicionário que corresponde ao schema 'RealizadoUnidadeSchema'.
+    # Retorna um dicionário que corresponde ao schema 'RealizadoUnidadeSchema'.
     return {"unidade": nome_unidade, "total_realizado": soma_total}
 
 
 # === NOVA ROTA: RELATÓRIO RESUMO DAS METAS ===
 @router.get("/relatorio/resumo-metas")
-def get_relatorio_resumo_metas(db: Session = Depends(get_db)):
+def get_relatorio_resumo_metas(
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     RELATÓRIO RESUMO DAS METAS - Retorna estrutura completa como no Excel
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, usa o mês mais recente disponível.
     
     Retorna:
     - Resumo das Metas por Unidade (seção principal)
@@ -514,14 +676,33 @@ def get_relatorio_resumo_metas(db: Session = Depends(get_db)):
     try:
         print("=== DEBUG: Iniciando relatório resumo metas ===")
         
+        # Auto-detectar mês mais recente se não fornecido
+        if not mes_ref:
+            # Buscar o mês mais recente das metas
+            mes_recente = db.query(MetaColaborador.mes_ref).order_by(
+                MetaColaborador.mes_ref.desc()
+            ).first()
+            if mes_recente:
+                mes_ref = mes_recente.mes_ref
+                print(f"DEBUG: Usando mês mais recente: {mes_ref}")
+            else:
+                raise HTTPException(status_code=404, detail="Nenhum mês de referência encontrado")
+        
+        print(f"DEBUG: Gerando relatório para o mês: {mes_ref}")
+        
         # Verificar dados básicos primeiro
-        total_metas = db.query(MetaColaborador).count()
-        total_realizados = db.query(RealizadoColaborador).count()
+        total_metas = db.query(MetaColaborador).filter(
+            MetaColaborador.mes_ref == mes_ref
+        ).count()
+        total_realizados = db.query(RealizadoColaborador).filter(
+            RealizadoColaborador.mes_ref == mes_ref
+        ).count()
         print(f"DEBUG: Total metas: {total_metas}, Total realizados: {total_realizados}")
         
         # Estrutura do relatório
         relatorio = {
-            "titulo": "Resumo das Metas SETEMBRO/2025",
+            "titulo": f"Resumo das Metas {mes_ref}",
+            "mes_ref": mes_ref,
             "data_geracao": "2025-09-30",
             "dias_trabalhados": 22.5,
             "debug_info": {
@@ -529,10 +710,10 @@ def get_relatorio_resumo_metas(db: Session = Depends(get_db)):
                 "total_realizados": total_realizados
             },
             "secoes": {
-                "unidades": _get_resumo_unidades(db),
-                "gerentes": _get_resumo_gerentes(db), 
-                "coordenadores": _get_resumo_coordenadores(db),
-                "lideres_cm": _get_resumo_lideres_cm(db)
+                "unidades": _get_resumo_unidades(mes_ref, db),
+                "gerentes": _get_resumo_gerentes(mes_ref, db), 
+                "coordenadores": _get_resumo_coordenadores(mes_ref, db),
+                "lideres_cm": _get_resumo_lideres_cm(mes_ref, db)
             }
         }
         
@@ -546,14 +727,22 @@ def get_relatorio_resumo_metas(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
 
 #resumo metas
-def _get_resumo_unidades(db: Session):
-    """Retorna resumo das metas por unidade (seção principal)"""
+def _get_resumo_unidades(mes_ref: str, db: Session):
+    """
+    Retorna resumo das metas por unidade (seção principal) NO MÊS ESPECÍFICO.
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD')
+        db: Sessão do banco de dados
+    """
     try:
-        print("=== DEBUG: Iniciando _get_resumo_unidades ===")
+        print(f"=== DEBUG: Iniciando _get_resumo_unidades para mês {mes_ref} ===")
         
-        # Buscar todas as unidades com metas e realizados
-        unidades = db.query(MetaColaborador.unidade).distinct().all()
-        print(f"DEBUG: Encontradas {len(unidades)} unidades distintas")
+        # Buscar todas as unidades com metas NO MÊS ESPECÍFICO
+        unidades = db.query(MetaColaborador.unidade).filter(
+            MetaColaborador.mes_ref == mes_ref
+        ).distinct().all()
+        print(f"DEBUG: Encontradas {len(unidades)} unidades distintas no mês {mes_ref}")
         
         resumo_unidades = []
         
@@ -565,18 +754,20 @@ def _get_resumo_unidades(db: Session):
                 print("DEBUG: Unidade vazia, pulando...")
                 continue
                 
-            # Buscar meta total da unidade
+            # Buscar meta total da unidade NO MÊS ESPECÍFICO
             meta_total = db.query(func.sum(MetaColaborador.meta_final)).filter(
-                MetaColaborador.unidade == unidade
+                MetaColaborador.unidade == unidade,
+                MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
             ).scalar() or 0
             print(f"DEBUG: Meta total da unidade '{unidade}': {meta_total}")
             
-            # Buscar realizado por tipo para esta unidade
+            # Buscar realizado por tipo para esta unidade NO MÊS ESPECÍFICO
             realizados = db.query(
                 RealizadoColaborador.tipo_grupo,
                 func.sum(RealizadoColaborador.total_realizado).label("total")
             ).filter(
-                RealizadoColaborador.unidade == unidade
+                RealizadoColaborador.unidade == unidade,
+                RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
             ).group_by(RealizadoColaborador.tipo_grupo).all()
             
             print(f"DEBUG: Encontrados {len(realizados)} tipos de realizado para unidade '{unidade}'")
@@ -641,25 +832,32 @@ def _get_resumo_unidades(db: Session):
         return []
 
 
-def _get_resumo_gerentes(db: Session):
-    """Retorna resumo dos gerentes (coordenadoras das unidades)"""
+def _get_resumo_gerentes(mes_ref: str, db: Session):
+    """
+    Retorna resumo dos gerentes (coordenadoras das unidades) NO MÊS ESPECÍFICO.
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD')
+        db: Sessão do banco de dados
+    """
     try:
-        print("=== DEBUG: Iniciando _get_resumo_gerentes ===")
+        print(f"=== DEBUG: Iniciando _get_resumo_gerentes para mês {mes_ref} ===")
         
-        # Buscar colaboradores com cargo de gerente
+        # Buscar colaboradores com cargo de gerente NO MÊS ESPECÍFICO
         gerentes = db.query(MetaColaborador).filter(
-            MetaColaborador.cargo.ilike('%gerente%')
+            MetaColaborador.cargo.ilike('%gerente%'),
+            MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
         ).all()
         
-        print(f"DEBUG: Encontrados {len(gerentes)} gerentes")
+        print(f"DEBUG: Encontrados {len(gerentes)} gerentes no mês {mes_ref}")
         
         resumo_gerentes = []
         
         for gerente in gerentes:
             print(f"DEBUG: Processando gerente: {gerente.nome} - {gerente.cargo}")
             
-            # Aplicar regras de negócio para o gerente
-            resultado = _aplicar_regras_negocio_realizado(int(gerente.id_eyal), db)
+            # Aplicar regras de negócio para o gerente NO MÊS ESPECÍFICO
+            resultado = _aplicar_regras_negocio_realizado(int(gerente.id_eyal), mes_ref, db)
             
             item_gerente = {
                 "nome": gerente.nome,
@@ -681,19 +879,26 @@ def _get_resumo_gerentes(db: Session):
         return []
 
 
-def _get_resumo_coordenadores(db: Session):
-    """Retorna resumo dos coordenadores"""
+def _get_resumo_coordenadores(mes_ref: str, db: Session):
+    """
+    Retorna resumo dos coordenadores NO MÊS ESPECÍFICO.
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD')
+        db: Sessão do banco de dados
+    """
     try:
-        # Buscar colaboradores com cargo de coordenador
+        # Buscar colaboradores com cargo de coordenador NO MÊS ESPECÍFICO
         coordenadores = db.query(MetaColaborador).filter(
-            MetaColaborador.cargo.ilike('%coordenador%')
+            MetaColaborador.cargo.ilike('%coordenador%'),
+            MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
         ).all()
         
         resumo_coordenadores = []
         
         for coordenador in coordenadores:
-            # Aplicar regras de negócio para o coordenador
-            resultado = _aplicar_regras_negocio_realizado(int(coordenador.id_eyal), db)
+            # Aplicar regras de negócio para o coordenador NO MÊS ESPECÍFICO
+            resultado = _aplicar_regras_negocio_realizado(int(coordenador.id_eyal), mes_ref, db)
             
             resumo_coordenadores.append({
                 "nome": coordenador.nome,
@@ -709,36 +914,45 @@ def _get_resumo_coordenadores(db: Session):
         return []
 
 
-def _get_resumo_lideres_cm(db: Session):
-    """Retorna resumo dos líderes da Central de Mercações"""
+def _get_resumo_lideres_cm(mes_ref: str, db: Session):
+    """
+    Retorna resumo dos líderes da Central de Mercações NO MÊS ESPECÍFICO.
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD')
+        db: Sessão do banco de dados
+    """
     try:
-        print("=== DEBUG: Iniciando _get_resumo_lideres_cm ===")
+        print(f"=== DEBUG: Iniciando _get_resumo_lideres_cm para mês {mes_ref} ===")
         
-        # Buscar líderes da Central de Mercações
+        # Buscar líderes da Central de Mercações NO MÊS ESPECÍFICO
         print("DEBUG: Buscando por cargos específicos...")
         lideres_cm = db.query(MetaColaborador).filter(
-            MetaColaborador.unidade.ilike('%central%marcação%')
+            MetaColaborador.unidade.ilike('%central%marcação%'),
+            MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
         ).filter(
             MetaColaborador.cargo.ilike('%supervisor%') |
             MetaColaborador.cargo.ilike('%monitor%') |
             MetaColaborador.cargo.ilike('%orientador%')
         ).all()
         
-        print(f"DEBUG: Encontrados {len(lideres_cm)} líderes CM")
+        print(f"DEBUG: Encontrados {len(lideres_cm)} líderes CM no mês {mes_ref}")
         if len(lideres_cm) == 0:
-            # Tentar busca mais ampla por cargos
+            # Tentar busca mais ampla por cargos NO MÊS ESPECÍFICO
             print("DEBUG: Tentando busca mais ampla por cargos...")
             todos_cargos_central = db.query(MetaColaborador.cargo).filter(
-                MetaColaborador.unidade.ilike('%central%')
+                MetaColaborador.unidade.ilike('%central%'),
+                MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
             ).distinct().all()
             
             print("DEBUG: Cargos encontrados na Central:")
             for cargo_row in todos_cargos_central[:10]:
                 print(f"  - {cargo_row.cargo}")
                 
-            # Buscar com any supervisor, monitor, orientador
+            # Buscar com any supervisor, monitor, orientador NO MÊS ESPECÍFICO
             lideres_cm = db.query(MetaColaborador).filter(
-                MetaColaborador.unidade.ilike('%central%')
+                MetaColaborador.unidade.ilike('%central%'),
+                MetaColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
             ).filter(
                 MetaColaborador.cargo.ilike('%supervisor%') |
                 MetaColaborador.cargo.ilike('%monitor%') |
@@ -752,8 +966,8 @@ def _get_resumo_lideres_cm(db: Session):
         for lider in lideres_cm:
             print(f"DEBUG: Processando líder CM: {lider.nome} - {lider.cargo}")
             
-            # Aplicar regras de negócio para o líder
-            resultado = _aplicar_regras_negocio_realizado(int(lider.id_eyal), db)
+            # Aplicar regras de negócio para o líder NO MÊS ESPECÍFICO
+            resultado = _aplicar_regras_negocio_realizado(int(lider.id_eyal), mes_ref, db)
             
             resumo_lideres.append({
                 "nome": lider.nome,

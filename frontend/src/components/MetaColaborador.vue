@@ -516,7 +516,10 @@ export default {
         percentual_meta_equipe: 0,
         vendedores_ativos: 0
       },
-      carregandoRanking: true
+      carregandoRanking: true,
+      // ✅ NOVO: Controle de mês de referência
+      mesSelecionado: null, // Mês atual selecionado (formato 'YYYY-MM-DD')
+      mesesDisponiveis: [] // Lista de meses com dados disponíveis
     };
   },
   computed: {
@@ -607,6 +610,9 @@ export default {
     }
   },
   mounted() {
+    // ✅ NOVO: Carregar meses disponíveis primeiro
+    this.carregarMesesDisponiveis();
+    
     // Verificar se deve mostrar apenas a meta do usuário logado
     this.verificarModoUsuarioLogado();
     
@@ -638,6 +644,28 @@ export default {
     }
   },
   methods: {
+    // ✅ NOVO: Carregar lista de meses disponíveis
+    async carregarMesesDisponiveis() {
+      try {
+        console.log('Carregando meses disponíveis...');
+        const response = await axios.get('/metas/meses-disponiveis');
+        
+        if (response.data && response.data.meses) {
+          this.mesesDisponiveis = response.data.meses;
+          console.log('Meses disponíveis:', this.mesesDisponiveis);
+          
+          // Se não há mês selecionado, usar o mais recente (primeiro da lista)
+          if (!this.mesSelecionado && this.mesesDisponiveis.length > 0) {
+            this.mesSelecionado = this.mesesDisponiveis[0];
+            console.log('Mês inicial selecionado:', this.mesSelecionado);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar meses disponíveis:', error);
+        // Se falhar, continua normalmente (backend retornará mês mais recente)
+      }
+    },
+    
     verificarModoUsuarioLogado() {
       try {
         const auth = this.$auth;
@@ -683,7 +711,10 @@ export default {
       
       try {
         console.log('Carregando minha meta individual...');
-        const response = await axios.get('/metas/minha-meta');
+        
+        // ✅ NOVO: Passar mes_ref se estiver selecionado
+        const params = this.mesSelecionado ? `?mes_ref=${this.mesSelecionado}` : '';
+        const response = await axios.get(`/metas/minha-meta${params}`);
         
         console.log('Minha meta carregada:', response.data);
         
@@ -694,6 +725,10 @@ export default {
             if (a.mes_ref < b.mes_ref) return 1;
             return 0;
           })[0];
+          
+          // ✅ NOVO: Armazenar mes_ref da meta carregada
+          this.mesSelecionado = metaAtual.mes_ref;
+          console.log('Mês selecionado:', this.mesSelecionado);
           
           // Processar dados da meta para o formato esperado pelo componente
           await this.processarDadosMetaIndividual(metaAtual);
@@ -1103,11 +1138,23 @@ export default {
     
     async carregarDadosRealizado(idEyal) {
       try {
-        const response = await fetch(`${API_BASE_URL}/realizado/colaborador/${idEyal}/resumo`);
+        // ✅ CRÍTICO: Passar mes_ref para garantir que realizado seja do MESMO mês da meta
+        const params = this.mesSelecionado ? `?mes_ref=${this.mesSelecionado}` : '';
+        const url = `${API_BASE_URL}/realizado/colaborador/${idEyal}/resumo${params}`;
+        
+        console.log('Carregando realizado com URL:', url);
+        console.log('Mês de referência usado:', this.mesSelecionado || 'Mais recente (auto)');
+        
+        const response = await fetch(url);
         
         if (response.ok) {
           const dadosRealizado = await response.json();
           console.log('Dados de realizado:', dadosRealizado);
+          
+          // ✅ Verificar se o mês do realizado corresponde ao mês da meta
+          if (dadosRealizado.MES_REF && dadosRealizado.MES_REF !== this.mesSelecionado) {
+            console.warn(`⚠️ AVISO: Mês do realizado (${dadosRealizado.MES_REF}) diferente da meta (${this.mesSelecionado})`);
+          }
           
           // Calcula o total realizado (remove o TOTAL_GERAL do cálculo)
           const totalRealizado = dadosRealizado.TOTAL_GERAL || 0;

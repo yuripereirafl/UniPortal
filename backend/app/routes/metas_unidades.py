@@ -166,7 +166,7 @@ def dashboard_unidade(
     
     print(f"--- [DASHBOARD UNIDADE] Colaboradores: {total_colaboradores} total, {colaboradores_ativos} ativos ---")
     
-    # 3. Buscar dados realizados da unidade
+    # 3. Buscar dados realizados da unidade NO MÊS ESPECÍFICO
     # Somar todos os realizados dos colaboradores desta unidade
     ids_eyal_unidade = [int(c.id_eyal) for c in colaboradores_unidade if c.id_eyal]
     
@@ -175,21 +175,23 @@ def dashboard_unidade(
         realizado_total = 0
         realizado_por_categoria = {}
     else:
-        # Buscar realizado total
+        # Buscar realizado total NO MÊS ESPECÍFICO
         realizado_query = db.query(
             func.sum(RealizadoColaborador.total_realizado).label('total')
         ).filter(
-            RealizadoColaborador.id_eyal.in_(ids_eyal_unidade)
+            RealizadoColaborador.id_eyal.in_(ids_eyal_unidade),
+            RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
         ).first()
         
         realizado_total = float(realizado_query.total) if realizado_query.total else 0
         
-        # Buscar realizado por categoria
+        # Buscar realizado por categoria NO MÊS ESPECÍFICO
         realizado_categorias = db.query(
             RealizadoColaborador.tipo_grupo,
             func.sum(RealizadoColaborador.total_realizado).label('total')
         ).filter(
-            RealizadoColaborador.id_eyal.in_(ids_eyal_unidade)
+            RealizadoColaborador.id_eyal.in_(ids_eyal_unidade),
+            RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
         ).group_by(RealizadoColaborador.tipo_grupo).all()
         
         realizado_por_categoria = {cat.tipo_grupo: float(cat.total) for cat in realizado_categorias}

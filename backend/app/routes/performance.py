@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from app.database import get_db
+from typing import Optional
 
 # Importe os modelos das suas tabelas
 from app.models.funcionario import Funcionario 
@@ -17,13 +18,32 @@ router = APIRouter(
 )
 
 @router.get("/colaborador/{cpf}", response_model=PerformanceColaborador)
-def get_performance_por_cpf(cpf: str, db: Session = Depends(get_db)):
+def get_performance_por_cpf(
+    cpf: str, 
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retorna os dados consolidados de performance (Funcionário + Meta + Realizado)
     de um colaborador a partir do seu CPF.
+    
+    Args:
+        cpf: CPF do colaborador
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, usa o mês mais recente.
     """
 
-    # 1. Faz o JOIN entre Funcionario e Meta para encontrar o id_eyal
+    # ✅ NOVO: Auto-detectar mês mais recente se não fornecido
+    if not mes_ref:
+        mes_recente = db.query(RealizadoColaborador.mes_ref).order_by(
+            desc(RealizadoColaborador.mes_ref)
+        ).first()
+        if mes_recente:
+            mes_ref = mes_recente.mes_ref
+            print(f"[PERFORMANCE] Usando mês mais recente: {mes_ref}")
+        else:
+            raise HTTPException(status_code=404, detail="Nenhum dado de realizado encontrado")
+
+    # 1. Faz o JOIN entre Funcionario e Meta para encontrar o id_eyal NO MÊS ESPECÍFICO
     #    O .first() é usado aqui porque esperamos apenas um funcionário por CPF.
     funcionario_meta = db.query(
         Funcionario.nome,
@@ -34,16 +54,18 @@ def get_performance_por_cpf(cpf: str, db: Session = Depends(get_db)):
     ).join(
         Meta, Funcionario.cpf == Meta.cpf
     ).filter(
-        Funcionario.cpf == cpf
+        Funcionario.cpf == cpf,
+        Meta.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).first()
 
     if not funcionario_meta:
-        raise HTTPException(status_code=404, detail="Funcionário ou meta não encontrado para o CPF fornecido.")
+        raise HTTPException(status_code=404, detail=f"Funcionário ou meta não encontrado para o CPF fornecido no mês {mes_ref}.")
 
-    # 2. Com o id_eyal, busca todos os registros de 'realizado'
+    # 2. Com o id_eyal, busca todos os registros de 'realizado' NO MÊS ESPECÍFICO
     #    O .all() é usado aqui porque um colaborador pode ter vários registros.
     registros_realizado = db.query(RealizadoColaborador).filter(
-        RealizadoColaborador.id_eyal == funcionario_meta.id_eyal
+        RealizadoColaborador.id_eyal == funcionario_meta.id_eyal,
+        RealizadoColaborador.mes_ref == mes_ref  # ✅ FILTRO DE MÊS
     ).all()
     
     # 3. Calcula a soma total dos valores realizados

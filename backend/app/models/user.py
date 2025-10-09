@@ -9,4 +9,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     hashsenha = Column(String, nullable=False)
-    id_funcionario = Column(Integer, nullable=True)
+    id_funcionario = Column(Integer, ForeignKey('rh_homologacao.funcionarios.id'), nullable=True)
+    
+    # Relacionamento com Funcionario
+    funcionario = relationship("Funcionario", foreign_keys=[id_funcionario], lazy='joined')

@@ -48,7 +48,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # Permitir origin específica do frontend na VM e manter regex para outros ambientes locais
-    allow_origins=["http://192.168.1.5:8080", "http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=["http://192.168.1.202:8080", "http://localhost:8080", "http://127.0.0.1:8080"],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],

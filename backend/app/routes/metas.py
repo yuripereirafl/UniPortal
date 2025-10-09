@@ -1,8 +1,8 @@
 # routes/metas.py
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from typing import List
+from sqlalchemy import or_, func, desc
+from typing import List, Optional
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
@@ -15,6 +15,30 @@ router = APIRouter(
     prefix="/metas",  # Prefixo corrigido para /metas
     tags=["Metas"]
 )
+
+@router.get("/meses-disponiveis")
+def get_meses_disponiveis(db: Session = Depends(get_db)):
+    """
+    Retorna lista de meses disponíveis para filtrar metas e realizado,
+    ordenados do mais recente para o mais antigo.
+    
+    Returns:
+        {"meses": ["2025-10-01", "2025-09-01", ...]}
+    """
+    print("--- [ROTA METAS] Buscando meses disponíveis ---")
+    
+    # Buscar meses distintos das metas, ordenados DESC
+    meses = db.query(MetaColaborador.mes_ref)\
+        .distinct()\
+        .order_by(desc(MetaColaborador.mes_ref))\
+        .all()
+    
+    # Converter para lista de strings
+    lista_meses = [str(mes.mes_ref) for mes in meses]
+    
+    print(f"--- [ROTA METAS] Encontrados {len(lista_meses)} meses: {lista_meses} ---")
+    
+    return {"meses": lista_meses}
 
 @router.get("/colaboradores-com-metas")
 def get_colaboradores_com_metas(db: Session = Depends(get_db)):
@@ -76,15 +100,20 @@ def get_colaboradores_com_metas(db: Session = Depends(get_db)):
 
 @router.get("/minha-meta", response_model=List[MetaColaboradorSchema])
 def get_minha_meta(
+    mes_ref: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Retorna as metas do usuário logado com base no CPF do funcionário associado.
+    
+    Args:
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, retorna todos os meses ordenados por mais recente.
     """
     try:
         print(f"--- [ROTA METAS] Buscando meta do usuário logado: {current_user.username} ---")
         print(f"--- [ROTA METAS] ID funcionário: {current_user.id_funcionario} ---")
+        print(f"--- [ROTA METAS] Mês de referência: {mes_ref or 'Todos'} ---")
         
         # Verificar se o usuário tem id_funcionario
         if not current_user.id_funcionario:
@@ -107,16 +136,25 @@ def get_minha_meta(
         cpf_funcionario = funcionario.cpf
         print(f"--- [ROTA METAS] CPF do funcionário associado: {cpf_funcionario} ---")
         
-        # Buscar metas do funcionário
-        metas = db.query(MetaColaborador).filter(
+        # Construir query base
+        query = db.query(MetaColaborador).filter(
             MetaColaborador.cpf == cpf_funcionario
-        ).order_by(MetaColaborador.mes_ref.desc()).all()
+        )
+        
+        # Se mes_ref foi especificado, filtrar por mês
+        if mes_ref:
+            query = query.filter(MetaColaborador.mes_ref == mes_ref)
+            print(f"--- [ROTA METAS] Filtrando por mês: {mes_ref} ---")
+        
+        # Buscar metas do funcionário, ordenadas por mês mais recente
+        metas = query.order_by(desc(MetaColaborador.mes_ref)).all()
         
         if not metas:
-            print(f"--- [ROTA METAS] Nenhuma meta encontrada para o CPF {cpf_funcionario} ---")
+            mes_info = f" no mês {mes_ref}" if mes_ref else ""
+            print(f"--- [ROTA METAS] Nenhuma meta encontrada para o CPF {cpf_funcionario}{mes_info} ---")
             raise HTTPException(
                 status_code=404, 
-                detail=f"Nenhuma meta encontrada para o funcionário associado ao seu usuário."
+                detail=f"Nenhuma meta encontrada para o funcionário associado ao seu usuário{mes_info}."
             )
         
         print(f"--- [ROTA METAS] Encontradas {len(metas)} metas para o CPF {cpf_funcionario} ---")
@@ -136,22 +174,41 @@ def get_minha_meta(
 
 
 @router.get("/colaborador/{identificador}", response_model=List[MetaColaboradorSchema])
-def get_metas_colaborador(identificador: str, db: Session = Depends(get_db)):
+def get_metas_colaborador(
+    identificador: str, 
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retorna as metas de um colaborador com base no CPF ou id_eyal.
+    
+    Args:
+        identificador: CPF ou ID Eyal do colaborador
+        mes_ref: Mês de referência (formato 'YYYY-MM-DD'). Se não fornecido, retorna todos os meses ordenados.
     """
     print(f"--- [ROTA METAS] Procurando por identificador: {identificador} ---")
+    print(f"--- [ROTA METAS] Mês de referência: {mes_ref or 'Todos'} ---")
 
-    metas = db.query(MetaColaborador).filter(
+    # Construir query base
+    query = db.query(MetaColaborador).filter(
         or_(
             MetaColaborador.cpf == identificador,
             MetaColaborador.id_eyal == identificador
         )
-    ).all()
+    )
+    
+    # Se mes_ref foi especificado, filtrar por mês
+    if mes_ref:
+        query = query.filter(MetaColaborador.mes_ref == mes_ref)
+        print(f"--- [ROTA METAS] Filtrando por mês: {mes_ref} ---")
+    
+    # Buscar metas ordenadas por mês mais recente
+    metas = query.order_by(desc(MetaColaborador.mes_ref)).all()
 
     if not metas:
-        print(f"--- [ROTA METAS] Nenhuma meta encontrada para {identificador}. Retornando 404. ---")
-        raise HTTPException(status_code=404, detail="Metas não encontradas para o colaborador informado.")
+        mes_info = f" no mês {mes_ref}" if mes_ref else ""
+        print(f"--- [ROTA METAS] Nenhuma meta encontrada para {identificador}{mes_info}. Retornando 404. ---")
+        raise HTTPException(status_code=404, detail=f"Metas não encontradas para o colaborador informado{mes_info}.")
 
     print(f"--- [ROTA METAS] Encontradas {len(metas)} metas. Retornando 200 OK. ---")
     return metas
