@@ -1,5 +1,8 @@
 from typing import List, Optional, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+from typing import Optional, List, Union
+
+TIPOS_CONTRATO = ["CLT", "PJ", "Genérico", "Terceirizado"]
 from app.schemas.sistema import Sistema
 from app.schemas.setor import SetorOut
 from app.schemas.grupo_email import GrupoEmailOut
@@ -24,6 +27,14 @@ class FuncionarioBase(BaseModel):
     cpf: Optional[str] = None
     data_afastamento: Optional[str] = None
     tipo_contrato: Optional[str] = None
+
+    @validator('tipo_contrato')
+    def validar_tipo_contrato(cls, v):
+        if v is None or v == '':
+            return v
+        if v not in TIPOS_CONTRATO:
+            raise ValueError(f"Tipo de contrato inválido. Use: {', '.join(TIPOS_CONTRATO)}")
+        return v
     data_retorno: Optional[str] = None
     motivo_afastamento: Optional[str] = None
     meta: Optional[Union[float, str]] = None  

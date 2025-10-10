@@ -45,12 +45,16 @@ def _hash_password(password: str) -> str:
 @router.post('/funcionarios/', response_model=FuncionarioSchema)
 def adicionar_funcionario(funcionario: FuncionarioCreate):
     db = SessionLocal()
+    # Se tipo_contrato for Genérico ou Terceirizado, ignorar admissão, celular e cpf
+    tipo_contrato = (funcionario.tipo_contrato or '').strip().lower()
+    campos_opcionais = ['genérico', 'generico', 'terceirizado']
     novo_funcionario = FuncionarioModel(
         nome=funcionario.nome,
         sobrenome=funcionario.sobrenome,
-        celular=funcionario.celular,
+        celular=None if tipo_contrato in campos_opcionais else funcionario.celular,
         email=funcionario.email,
-        cpf=funcionario.cpf,
+        cpf=None if tipo_contrato in campos_opcionais else funcionario.cpf,
+        data_admissao=None if tipo_contrato in campos_opcionais else funcionario.data_admissao,
         data_afastamento=converter_string_para_date(funcionario.data_afastamento),
         tipo_contrato=funcionario.tipo_contrato,
         data_retorno=converter_string_para_date(funcionario.data_retorno),

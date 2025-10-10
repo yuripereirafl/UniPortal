@@ -114,82 +114,82 @@
           <div v-if="loadingStates.grupos" class="loading-overlay">
             <div class="mini-spinner"></div>
           </div>
-          <table style="min-width:1200px;">
+          <table class="responsive-table">
       <thead>
         <tr>
-          <th @click="toggleOrdenacaoNome" style="cursor:pointer">
+          <th class="col-nome" @click="toggleOrdenacaoNome" style="cursor:pointer">
             Nome
             <span v-if="ordenacaoNome === 'asc'">▲</span>
             <span v-else>▼</span>
           </th>
-          <th>Sobrenome</th>
-          <th>Data de Admissão</th>
-          <th>Data de Desligamento</th>
-          <th>Celular</th>
-          <th>E-mail</th>
-          <th>Grupo E-mail</th>
-          <th>Grupo WhatsApp</th>
-          <th>Pastas</th>
-          <th>Setor</th>
-          <th>Cargo</th>
-          <th>Sistemas</th>
-          <th>Ações</th>
+          <th class="col-sobrenome">Sobrenome</th>
+          <th class="col-admissao">Data de Admissão</th>
+          <th class="col-desligamento">Data de Desligamento</th>
+          <th class="col-celular">Celular</th>
+          <th class="col-email">E-mail</th>
+          <th class="col-grupo-email">Grupo E-mail</th>
+          <th class="col-grupo-whatsapp">Grupo WhatsApp</th>
+          <th class="col-pastas">Pastas</th>
+          <th class="col-setor">Setor</th>
+          <th class="col-cargo">Cargo</th>
+          <th class="col-sistemas">Sistemas</th>
+          <th class="col-acoes">Ações</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="func in funcionariosFiltrados" :key="func.id">
-          <td :class="['clicavel', celulasExpandidas.has('nome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('nome-' + func.id)">
+          <td class="col-nome" :class="['clicavel', celulasExpandidas.has('nome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('nome-' + func.id)">
             {{ func.nome }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('sobrenome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sobrenome-' + func.id)">
+          <td class="col-sobrenome" :class="['clicavel', celulasExpandidas.has('sobrenome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sobrenome-' + func.id)">
             {{ func.sobrenome }}
           </td>
-          <td>
+          <td class="col-admissao">
             {{ func.data_admissao ? func.data_admissao.split('-').reverse().join('/') : '—' }}
           </td>
-          <td>
+          <td class="col-desligamento">
             {{ func.data_inativado ? func.data_inativado.split('-').reverse().join('/') : '—' }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('celular-' + func.id) ? 'expandida' : '']" @click="toggleCelula('celular-' + func.id)">
+          <td class="col-celular" :class="['clicavel', celulasExpandidas.has('celular-' + func.id) ? 'expandida' : '']" @click="toggleCelula('celular-' + func.id)">
             {{ func.celular }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('email-' + func.id) ? 'expandida' : '']" @click="toggleCelula('email-' + func.id)">
+          <td class="col-email" :class="['clicavel', celulasExpandidas.has('email-' + func.id) ? 'expandida' : '']" @click="toggleCelula('email-' + func.id)">
             {{ func.email }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('grupos-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-' + func.id)">
+          <td class="col-grupo-email" :class="['clicavel', celulasExpandidas.has('grupos-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-' + func.id)">
             <span v-if="func.grupos_email && func.grupos_email.length">
               {{ func.grupos_email.map(g => g.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('grupos-whatsapp-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-whatsapp-' + func.id)">
+          <td class="col-grupo-whatsapp" :class="['clicavel', celulasExpandidas.has('grupos-whatsapp-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-whatsapp-' + func.id)">
             <span v-if="func.grupos_whatsapp && func.grupos_whatsapp.length">
               {{ func.grupos_whatsapp.map(g => g.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('grupos-pasta-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-pasta-' + func.id)">
+          <td class="col-pastas" :class="['clicavel', celulasExpandidas.has('grupos-pasta-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-pasta-' + func.id)">
             <span v-if="func.grupos_pasta && func.grupos_pasta.length">
               {{ func.grupos_pasta.map(g => g.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('setores-' + func.id) ? 'expandida' : '']" @click="toggleCelula('setores-' + func.id)">
+          <td class="col-setor" :class="['clicavel', celulasExpandidas.has('setores-' + func.id) ? 'expandida' : '']" @click="toggleCelula('setores-' + func.id)">
             <span v-if="func.setores && func.setores.length">
               {{ func.setores.map(s => s.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('cargo-' + func.id) ? 'expandida' : '']" @click="toggleCelula('cargo-' + func.id)">
+          <td class="col-cargo" :class="['clicavel', celulasExpandidas.has('cargo-' + func.id) ? 'expandida' : '']" @click="toggleCelula('cargo-' + func.id)">
             {{ func.cargo && typeof func.cargo === 'object' && func.cargo.nome ? func.cargo.nome : (func.cargo || '—') }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('sistemas-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sistemas-' + func.id)">
+          <td class="col-sistemas" :class="['clicavel', celulasExpandidas.has('sistemas-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sistemas-' + func.id)">
             <span v-if="func.sistemas && func.sistemas.length">
               {{ func.sistemas.map(s => `${s.nome} (${s.status})`).join(', ') }}
             </span>
             <span v-else>Nenhum sistema vinculado</span>
           </td>
-          <td>
+          <td class="col-acoes">
             <div class="action-buttons-table">
               <button v-if="$auth && ($auth.hasPermission('editar_colaborador') || $auth.hasPermission('adm'))" class="btn-editar" @click="abrirEditar(func)">
                 <i class="fas fa-edit"></i>
@@ -303,15 +303,15 @@
               <label>Sobrenome</label>
               <input v-model="form.sobrenome" placeholder="Sobrenome" required />
             </div>
-            <div>
+            <div v-if="!contratoEspecial">
               <label>Celular</label>
               <input v-model="form.celular" placeholder="Celular" />
             </div>
-            <div>
+            <div v-if="!contratoEspecial">
               <label>CPF</label>
-              <input v-model="form.cpf" placeholder="CPF" />
+              <input v-model="form.cpf" placeholder="CPF" :required="contratoObrigatorio" />
             </div>
-            <div>
+            <div v-if="!contratoEspecial">
               <label>ID Eyal</label>
               <input v-model="form.id_eyal" placeholder="ID Eyal" />
             </div>
@@ -321,7 +321,13 @@
             </div>
             <div>
               <label>Tipo de Contrato</label>
-              <input v-model="form.tipo_contrato" placeholder="Tipo de Contrato" />
+              <select v-model="form.tipo_contrato" class="select-tipo-contrato">
+                <option value="">Selecione...</option>
+                <option value="CLT">CLT</option>
+                <option value="PJ">PJ</option>
+                <option value="Genérico">Genérico</option>
+                <option value="Terceirizado">Terceirizado</option>
+              </select>
             </div>
             <div style="grid-column: span 2;">
               <label>E-mail</label>
@@ -629,8 +635,27 @@ export default {
         !this.form.sistemas_ids.includes(sistema.id)
       );
     }
+    ,
+    contratoEspecial() {
+      const tipo = (this.form.tipo_contrato || '').toString().toLowerCase();
+      return tipo === 'genérico' || tipo === 'generico' || tipo === 'terceirizado';
+    },
+    contratoObrigatorio() {
+      const tipo = (this.form.tipo_contrato || '').toString().toLowerCase();
+      return tipo === 'clt' || tipo === 'pj';
+    }
   },
   methods: {
+    checkScreenSize() {
+      const w = window.innerWidth;
+      // Se a tela for pequena, trocar para 'cards' automaticamente
+      if (w <= 1024) {
+        this.viewMode = 'cards';
+      } else {
+        // Mantém o modo atual se o usuário já tiver alterado manualmente
+        if (!this.viewMode) this.viewMode = 'table';
+      }
+    },
     debouncedBusca() {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(() => {
@@ -1019,6 +1044,14 @@ export default {
   mounted() {
     // Carregamento otimizado - dados principais primeiro
     this.inicializarComponente();
+    // checar e reagir a mudanças de tamanho para responsividade
+    this.checkScreenSize();
+    window.addEventListener('resize', this.checkScreenSize);
+  }
+
+  ,
+  beforeUnmount() {
+    window.removeEventListener('resize', this.checkScreenSize);
   }
 }
 </script>
@@ -1049,13 +1082,119 @@ export default {
 
 /* Container principal otimizado */
 .funcionarios-container {
-  padding: 2rem;
+  padding: 1.2rem 1.2rem 2rem 1.2rem;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   min-height: 100vh;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: auto; /* permitir rolagem horizontal quando necessário para evitar corte */
   box-sizing: border-box;
+}
+
+/* Tabela responsiva: permite rolagem horizontal em telas pequenas/zoom alto */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-table {
+  min-width: 900px; /* reduzido de 1200 para 900 para evitar corte em 100% zoom */
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-view table th,
+.table-view table td {
+  white-space: nowrap;
+}
+
+/* Ajustes para caber melhor em 1366x768 */
+@media (max-width: 1366px) {
+  .funcionarios-container {
+    padding: 0.6rem;
+  }
+
+  .header-premium {
+    padding: 0.8rem;
+    margin-bottom: 0.8rem;
+    border-radius: 10px;
+  }
+
+  .header-title h1 {
+    font-size: 1.15rem;
+  }
+
+  .header-icon {
+    font-size: 1.15rem;
+  }
+
+  .header-right {
+    max-width: 520px;
+  }
+
+  .controls-group {
+    gap: 0.6rem;
+  }
+
+  .stats-dashboard {
+    gap: 0.5rem;
+  }
+
+  .stat-card {
+    padding: 0.4rem 0.6rem;
+    min-width: 120px;
+    border-radius: 8px;
+  }
+
+  .stat-number {
+    font-size: 1.05rem;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+  }
+
+  .table-container {
+    margin-top: 0.4rem;
+  }
+
+  .responsive-table th,
+  .responsive-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  /* Esconder colunas menos importantes para reduzir largura total (por classe) */
+  .col-grupo-email,
+  .col-grupo-whatsapp,
+  .col-pastas,
+  .col-sistemas,
+  .col-setor,
+  .col-cargo {
+    display: none;
+  }
+
+  /* Reduz altura das linhas */
+  .responsive-table tbody tr td {
+    line-height: 1.2;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* Tornar botões de ação menores */
+  .action-buttons-table .btn-editar,
+  .action-buttons-table .btn-excluir {
+    width: 34px;
+    height: 34px;
+    padding: 6px;
+    font-size: 12px;
+  }
+
+  /* reduzir min-width para acomodar mais colunas sem scroll */
+  .responsive-table {
+    min-width: 760px;
+  }
 }
 
 /* Transições e elementos de loading */
@@ -1116,9 +1255,9 @@ export default {
 
 .header-premium {
   background: #3b82f6;
-  border-radius: 20px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+  border-radius: 18px;
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1.2rem;
   box-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.1),
     0 1px 2px rgba(0, 0, 0, 0.1);
@@ -1139,7 +1278,7 @@ export default {
 
 .header-title h1 {
   margin: 0;
-  font-size: 2.2rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: #ffffff;
   display: flex;
@@ -2341,6 +2480,22 @@ tbody tr:last-child td {
   .funcionarios-container {
     padding: 1.5rem;
   }
+}
+</style>
+
+<style scoped>
+.select-tipo-contrato {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  background: #f0f9ff;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+.select-tipo-contrato:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
 }
 </style>
 
