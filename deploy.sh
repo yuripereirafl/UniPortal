@@ -8,7 +8,9 @@ set -euo pipefail
 #  use_compose: "true"|"false" - quando true (padrão) o script define DB_HOST=db no .env
 
 BRANCH=${1:-main}
-USE_COMPOSE=${2:-true}
+# START_DB: when true the script will start the full compose stack including the 'db' service
+# when false (default) the script will only start backend and frontend with --no-deps
+START_DB=${2:-false}
 TARGET_DIR="${HOME}/System_ti-main"
 REPO_URL="https://github.com/yuripereirafl/UniPortal.git"
 
@@ -45,22 +47,31 @@ else
   echo "Atenção: .env não encontrado no repositório. Crie um arquivo .env com suas variáveis de ambiente." 
 fi
 
-if [ "$USE_COMPOSE" = "true" ] || [ "$USE_COMPOSE" = "True" ]; then
-  # Quando o stack for iniciado via docker-compose, o host do DB no backend deve ser 'db'
+if [ "$START_DB" = "true" ] || [ "$START_DB" = "True" ]; then
+  # When we start the full compose (including db) we set DB_HOST=db so backend resolves to the
+  # internal docker service name. This is explicit and opt-in (do not enable unless you want
+  # to run a containerized Postgres on the same host).
   if grep -q '^DB_HOST=' .env 2>/dev/null; then
-    sed -i 's/^DB_HOST=.*/DB_HOST=db/' .env
-    echo "Ajustado DB_HOST=db no .env para uso com docker-compose"
+    sed -i 's~^DB_HOST=.*~DB_HOST=db~' .env
+    echo "Ajustado DB_HOST=db no .env para uso com docker-compose (full stack)"
   else
     echo "DB_HOST=db" >> .env
     echo "Adicionada linha DB_HOST=db no .env"
   fi
+else
+  echo "START_DB is false: will NOT modify DB_HOST and will start backend+frontend only (no db)"
 fi
 
 echo "Parando containers antigos (se existirem)..."
 sudo docker compose down || true
 
-echo "Subindo containers (rebuild)..."
-sudo docker compose up -d --build --remove-orphans
+if [ "$START_DB" = "true" ] || [ "$START_DB" = "True" ]; then
+  echo "Subindo containers (full stack, incluindo db)"
+  sudo docker compose up -d --build --remove-orphans
+else
+  echo "Subindo apenas backend e frontend (sem iniciar db)"
+  sudo docker compose up -d --build --no-deps backend frontend
+fi
 
 echo "Aguardando alguns segundos para o startup..."
 sleep 5
