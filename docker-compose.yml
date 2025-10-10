@@ -1,13 +1,17 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
+      # Quando não houver variável DB_HOST no arquivo .env, usar por padrão
+      # o banco externo na VM 192.168.1.37. Para evitar confusão entre a
+      # porta exposta no HOST e a porta interna do container, usamos duas
+      # variáveis: HOST_DB_PORT (mapeamento host) e INTERNAL_DB_PORT (porta
+      # que o Postgres escuta dentro da rede Docker). Por padrão a porta
+      # interna é 5432.
+      - DB_HOST=${DB_HOST:-192.168.1.37}
+      - DB_PORT=${INTERNAL_DB_PORT:-5432}
       - DB_USER=${DB_USER:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-yourpassword}
       - DB_NAME=${DB_NAME:-intelix_rh}
@@ -35,7 +39,9 @@ services:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-yourpassword}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      # Mapear porta do host para a porta interna 5432. Use HOST_DB_PORT
+      # se precisar expor outra porta no host (ex: 5433:5432).
+      - "${HOST_DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
