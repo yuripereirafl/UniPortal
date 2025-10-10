@@ -259,7 +259,7 @@
             <div class="kpi-icon">
               <i class="fas fa-calendar-day"></i>
             </div>
-            <span class="kpi-titulo">Realizado Dia</span>
+            <span class="kpi-titulo">Média Dia</span>
           </div>
           <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.realizadoDia || 0) }}</div>
           <div class="kpi-sublabel">Performance diária</div>
@@ -765,7 +765,7 @@ export default {
         totalRealizado: 0, // Será atualizado por carregarDadosRealizado
         realizadoDia: 0, // Será atualizado por carregarDadosRealizado
         percentualMeta: 0, // Será calculado baseado no realizado
-        nps: '83,33', // Valor padrão
+        nps: 0, // Será atualizado por carregarNPSReal
         vendas: {
           odonto: 0,
           babyClick: 0,
@@ -774,14 +774,10 @@ export default {
           orcamentos: 0
         },
         comissao: {
-          projecaoMeta: 0,
-          campanhas: 0
+          projecaoMeta: 0, // TODO: Implementar cálculo real
+          campanhas: 0 // TODO: Implementar cálculo real
         },
-        categorias: [
-          { nome: 'Odonto', icon: 'fas fa-tooth', meta: 10, realizado: 6 },
-          { nome: 'Check-Up', icon: 'fas fa-stethoscope', meta: 50, realizado: 35 },
-          { nome: 'Dr Central', icon: 'fas fa-user-md', meta: 20, realizado: 15 }
-        ],
+        categorias: [], // Será preenchido por carregarDadosRealizado
         ultimos7Dias: 0,
         mesAnterior: 0
       };
@@ -1024,24 +1020,24 @@ export default {
             metaDiaria: colaborador.meta_diaria || 0,
             diasTrabalhados: colaborador.dias_trabalhados || 0,
             diasFalta: colaborador.dias_de_falta || 0,
-            totalRealizado: 0, // Será preenchido quando tivermos dados de realizado
+            totalRealizado: 0, // Será preenchido por carregarDadosRealizado
             realizadoDia: 0, // Será calculado baseado na performance
             percentualMeta: 0, // Será calculado quando tivermos dados de realizado
-            nps: '83,33', // Valor padrão
-            // Novos campos para vendas
+            nps: 0, // Será atualizado por carregarNPSReal
+            // Campos de vendas - serão atualizados por carregarVendasReais
             vendas: {
-              odonto: 6,
+              odonto: 0,
               babyClick: 0,
-              checkUp: 35,
-              drCentral: 15,
-              orcamentos: 63
+              checkUp: 0,
+              drCentral: 0,
+              orcamentos: 0
             },
-            // Novos campos para comissão
+            // Campos de comissão - TODO: implementar cálculo real
             comissao: {
-              projecaoMeta: 120,
-              campanhas: 157
+              projecaoMeta: 0,
+              campanhas: 0
             },
-            categorias: [], // Será preenchido quando tivermos dados de realizado
+            categorias: [], // Será preenchido por carregarDadosRealizado
             ultimos7Dias: 0,
             mesAnterior: 0,
             mesRef: colaborador.mes_ref || new Date().toISOString().slice(0, 7),
@@ -1103,24 +1099,24 @@ export default {
           metaDiaria: metaAtual.meta_diaria || 0,
           diasTrabalhados: metaAtual.dias_trabalhados || 0,
           diasFalta: metaAtual.dias_de_falta || 0,
-          totalRealizado: 0, // Será preenchido quando tivermos dados de realizado
+          totalRealizado: 0, // Será preenchido por carregarDadosRealizado
           realizadoDia: 0, // Será calculado baseado na performance
           percentualMeta: 0, // Será calculado quando tivermos dados de realizado
-          nps: '83,33', // Valor padrão
-          // Novos campos para vendas
+          nps: 0, // Será atualizado por carregarNPSReal
+          // Campos de vendas - serão atualizados por carregarVendasReais
           vendas: {
-            odonto: 6,
+            odonto: 0,
             babyClick: 0,
-            checkUp: 35,
-            drCentral: 15,
-            orcamentos: 63
+            checkUp: 0,
+            drCentral: 0,
+            orcamentos: 0
           },
-          // Novos campos para comissão
+          // Campos de comissão - TODO: implementar cálculo real
           comissao: {
-            projecaoMeta: 120,
-            campanhas: 157
+            projecaoMeta: 0,
+            campanhas: 0
           },
-          categorias: [], // Será preenchido quando tivermos dados de realizado
+          categorias: [], // Será preenchido por carregarDadosRealizado
           ultimos7Dias: 0,
           mesAnterior: 0,
           mesRef: metaAtual.mes_ref,
@@ -1188,6 +1184,9 @@ export default {
 
           // ✅ NOVO: Buscar NPS REAL da tabela resultadocsat
           await this.carregarNPSReal(idEyal);
+
+          // ✅ NOVO: Buscar ORÇAMENTOS REAIS da tabela orcamentos
+          await this.carregarOrcamentosReais(idEyal);
 
           // Atualiza comissão baseada na performance - ZERADO até implementar cálculo real
           const percentualPerformance = this.dadosColaborador.percentualMeta / 100;
@@ -1374,6 +1373,80 @@ export default {
       } catch (error) {
         console.error('❌ Exceção ao carregar NPS:', error);
         this.dadosColaborador.nps = 0;
+      }
+    },
+
+    async carregarOrcamentosReais(idEyal) {
+      try {
+        // Converter mes_ref de 'YYYY-MM-DD' para 'YYYY-MM'
+        let mesRef = null;
+        if (this.mesSelecionado) {
+          mesRef = this.mesSelecionado.substring(0, 7); // '2024-09-01' -> '2024-09'
+        } else {
+          const hoje = new Date();
+          mesRef = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        const urlOrcamentos = `${API_BASE_URL}/orcamentos/colaborador/${idEyal}?mes_ref=${mesRef}`;
+        console.log('📋 Carregando ORÇAMENTOS REAIS da tabela orcamentos:', urlOrcamentos);
+
+        const responseOrcamentos = await fetch(urlOrcamentos);
+
+        if (responseOrcamentos.ok) {
+          const dadosOrcamentos = await responseOrcamentos.json();
+          console.log('✅ Dados de orçamentos recebidos:', dadosOrcamentos);
+
+          if (dadosOrcamentos.success && dadosOrcamentos.orcamentos) {
+            // ✅ Usar dados REAIS da tabela orcamentos
+            const orc = dadosOrcamentos.orcamentos;
+            
+            // ✅ Popular o campo de vendas.orcamentos (para a seção de vendas)
+            if (!this.dadosColaborador.vendas) {
+              this.dadosColaborador.vendas = {};
+            }
+            this.dadosColaborador.vendas.orcamentos = orc.total || 0;
+            
+            // Também armazenar informações detalhadas para uso futuro
+            this.dadosColaborador.orcamentosConfirmados = orc.confirmados || 0;
+            this.dadosColaborador.orcamentosPendentes = orc.pendentes || 0;
+            this.dadosColaborador.taxaConfirmacao = orc.taxa_confirmacao || 0;
+
+            console.log('✅ ORÇAMENTOS REAIS aplicados:', {
+              total: this.dadosColaborador.vendas.orcamentos,
+              confirmados: this.dadosColaborador.orcamentosConfirmados,
+              pendentes: this.dadosColaborador.orcamentosPendentes,
+              taxa: this.dadosColaborador.taxaConfirmacao + '%'
+            });
+          } else {
+            console.warn('⚠️ Nenhum orçamento encontrado para este colaborador/período');
+            if (!this.dadosColaborador.vendas) {
+              this.dadosColaborador.vendas = {};
+            }
+            this.dadosColaborador.vendas.orcamentos = 0;
+            this.dadosColaborador.orcamentosConfirmados = 0;
+            this.dadosColaborador.orcamentosPendentes = 0;
+            this.dadosColaborador.taxaConfirmacao = 0;
+          }
+        } else {
+          const errorText = await responseOrcamentos.text();
+          console.error('❌ Erro ao buscar orçamentos:', responseOrcamentos.status, errorText);
+          if (!this.dadosColaborador.vendas) {
+            this.dadosColaborador.vendas = {};
+          }
+          this.dadosColaborador.vendas.orcamentos = 0;
+          this.dadosColaborador.orcamentosConfirmados = 0;
+          this.dadosColaborador.orcamentosPendentes = 0;
+          this.dadosColaborador.taxaConfirmacao = 0;
+        }
+      } catch (error) {
+        console.error('❌ Exceção ao carregar orçamentos:', error);
+        if (!this.dadosColaborador.vendas) {
+          this.dadosColaborador.vendas = {};
+        }
+        this.dadosColaborador.vendas.orcamentos = 0;
+        this.dadosColaborador.orcamentosConfirmados = 0;
+        this.dadosColaborador.orcamentosPendentes = 0;
+        this.dadosColaborador.taxaConfirmacao = 0;
       }
     },
     
@@ -1903,6 +1976,10 @@ export default {
 
 .kpi-card.nps .kpi-icon {
   background: linear-gradient(135deg, #ffc107, #ff8f00);
+}
+
+.kpi-card.orcamentos .kpi-icon {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
 }
 
 .kpi-titulo {
