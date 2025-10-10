@@ -181,7 +181,7 @@
             <span v-else>—</span>
           </td>
           <td class="col-cargo" :class="['clicavel', celulasExpandidas.has('cargo-' + func.id) ? 'expandida' : '']" @click="toggleCelula('cargo-' + func.id)">
-            {{ func.cargo && typeof func.cargo === 'object' && func.cargo.nome ? func.cargo.nome : (func.cargo || '—') }}
+            {{ firstCargoNome(func.cargo) || '—' }}
           </td>
           <td class="col-sistemas" :class="['clicavel', celulasExpandidas.has('sistemas-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sistemas-' + func.id)">
             <span v-if="func.sistemas && func.sistemas.length">
@@ -215,7 +215,7 @@
               </div>
               <div class="employee-info">
                 <h3 class="employee-name">{{ func.nome }} {{ func.sobrenome }}</h3>
-                <p class="employee-cargo">{{ func.cargo || 'Sem cargo definido' }}</p>
+                <p class="employee-cargo">{{ firstCargoNome(func.cargo) || 'Sem cargo definido' }}</p>
               </div>
               <div class="employee-status">
                 <span :class="['status-badge', func.data_inativado ? 'inactive' : 'active']">
@@ -948,6 +948,24 @@ export default {
       axios.get(`${API_BASE_URL}/funcionarios/${func.id}/sistemas`).then(res => {
         this.form.sistemas_ids = res.data.map(s => s.id);
       });
+    },
+    firstCargoNome(cargo) {
+      try {
+        if (!cargo) return '';
+        // Se for objeto, preferir propriedades comuns
+        let nome = '';
+        if (typeof cargo === 'string') {
+          nome = cargo;
+        } else if (typeof cargo === 'object') {
+          nome = cargo.nome || cargo.cargo_nome || cargo.funcao || '';
+        }
+        nome = String(nome).trim();
+        if (!nome) return '';
+        // Retornar apenas a primeira palavra do cargo
+        return nome.split(/\s+/)[0];
+      } catch (e) {
+        return '';
+      }
     },
     async salvarEdicaoFuncionario() {
       // Garante tipos corretos antes do envio
