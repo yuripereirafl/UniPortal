@@ -27,6 +27,8 @@ services:
     environment:
       # Forçar URL da API apontando para a VM pública/privada onde o backend estará
       - VUE_APP_API_URL=http://192.168.1.37:8000
+      # Vite expects env vars prefixed with VITE_ at build/runtime
+      - VITE_API_URL=http://192.168.1.37:8000
     depends_on:
       - backend
     networks:
