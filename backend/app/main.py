@@ -39,6 +39,7 @@ from app.routes.ranking import router as ranking_router
 from app.routes.vendas import router as vendas_router 
 from app.routes.nps import router as nps_router  # ✅ NOVO: NPS/CSAT
 from app.routes.orcamentos import router as orcamentos_router  # ✅ NOVO: Orçamentos
+from app.routes.comissao import router as comissao_router  # ✅ NOVO: Comissões
 
 # --- INICIALIZAÇÃO DA APLICAÇÃO ---
 app = FastAPI(
@@ -83,7 +84,7 @@ app.include_router(ranking_router, prefix="/ranking", tags=["Ranking de Vendedor
 app.include_router(vendas_router)  # ✅ Vendas da basecampanhas
 app.include_router(nps_router)  # ✅ NOVO: NPS/CSAT
 app.include_router(orcamentos_router)  # ✅ NOVO: Orçamentos
-app.include_router(vendas_router)
+app.include_router(comissao_router)  # ✅ NOVO: Comissões
 
 # --- OS SEUS ENDPOINTS DE DASHBOARD (MANTIDOS INTACTOS) ---
 @app.get("/dashboard/totais")

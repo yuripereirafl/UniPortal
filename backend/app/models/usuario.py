@@ -1,5 +1,7 @@
-from sqlalchemy import Table, Column, Integer, ForeignKey
+from sqlalchemy import Table, Column, Integer, String, BigInteger, ForeignKey
+from sqlalchemy.orm import relationship
 from app.models.base import Base
+from app.models.usuario_grupo import usuario_grupo
 
 usuario_setor = Table(
     'usuario_setor',
@@ -8,11 +10,6 @@ usuario_setor = Table(
     Column('setor_id', Integer, ForeignKey('rh_homologacao.setores.id'), primary_key=True),
     schema='rh_homologacao'
 )
-
-from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey
-from sqlalchemy.orm import relationship
-from ..database import Base
-from .usuario_grupo import usuario_grupo
 
 class Usuario(Base):
     __tablename__ = "usuarios"

@@ -353,13 +353,17 @@ def obter_rankings_por_categoria(
 
 @router.get("/rankings-top10")
 async def get_rankings_top10(
-    mes_ref: str = "2025-09", 
+    mes_ref: Optional[str] = Query(None, description="Mês de referência (YYYY-MM)"), 
     unidade: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
     Endpoint para retornar top 10 vendedores reais por categoria
     """
+    # Se não fornecido, usar mês atual
+    if not mes_ref:
+        mes_ref = datetime.now().strftime("%Y-%m")
+    
     print(f"--- [RANKINGS TOP 10] Iniciando para {mes_ref}, unidade: {unidade} ---")
     
     try:
@@ -368,7 +372,8 @@ async def get_rankings_top10(
             ano, mes = mes_ref.split('-')
             data_ref = f"{ano}-{mes}-01"
         except:
-            data_ref = "2025-09-01"
+            # Fallback para mês atual se houver erro no parse
+            data_ref = datetime.now().strftime("%Y-%m-01")
         
         # Query para buscar top 10 vendedores por categoria
         filtro_unidade = ""

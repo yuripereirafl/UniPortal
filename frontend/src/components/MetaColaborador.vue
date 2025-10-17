@@ -257,12 +257,12 @@
         <div class="kpi-card media-diaria">
           <div class="kpi-header">
             <div class="kpi-icon">
-              <i class="fas fa-calendar-day"></i>
+              <i class="fas fa-calendar-check"></i>
             </div>
-            <span class="kpi-titulo">Média Dia</span>
+            <span class="kpi-titulo">Produção Dia</span>
           </div>
           <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.realizadoDia || 0) }}</div>
-          <div class="kpi-sublabel">Performance diária</div>
+          <div class="kpi-sublabel">Dados D-1 (dia anterior)</div>
         </div>
 
         <div class="kpi-card esperado-dia">
@@ -274,6 +274,17 @@
           </div>
           <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.metaDiaria || 0) }}</div>
           <div class="kpi-sublabel">Meta diária</div>
+        </div>
+
+        <div class="kpi-card producao-media">
+          <div class="kpi-header">
+            <div class="kpi-icon">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <span class="kpi-titulo">Produção Média Dia</span>
+          </div>
+          <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.producaoMediaDia || 0) }}</div>
+          <div class="kpi-sublabel">Média D-1: {{ dadosColaborador.diasUteisDecorridos || 0 }} dias úteis</div>
         </div>
 
         <div class="kpi-card nps">
@@ -364,6 +375,14 @@
             </div>
           </div>
         </div>
+
+        <!-- ✅ NOVO: Componente de Detalhamento Expandível -->
+        <DetalhamentoComissao
+          v-if="colaboradorSelecionadoId"
+          :id-eyal="colaboradorSelecionadoId"
+          :mes-ref="mesSelecionado"
+          :mostrar-lista-vendas="false"
+        />
       </div>
 
       <!-- Seção de Projeções -->
@@ -490,9 +509,13 @@
 <script>
 import axios from 'axios'
 import { API_BASE_URL } from '@/api.js'
+import DetalhamentoComissao from './DetalhamentoComissao.vue'
 
 export default {
   name: 'MetaColaborador',
+  components: {
+    DetalhamentoComissao
+  },
   props: {
     colaboradores: {
       type: Array,
@@ -763,7 +786,9 @@ export default {
         metaTotal: meta.meta_final || 0,
         metaDiaria: meta.meta_diaria || 0,
         totalRealizado: 0, // Será atualizado por carregarDadosRealizado
-        realizadoDia: 0, // Será atualizado por carregarDadosRealizado
+        realizadoDia: 0, // Será atualizado por carregarProducaoDiaAnterior (D-1)
+        producaoMediaDia: 0, // Será calculado por carregarDadosRealizado (média do período)
+        diasUteisDecorridos: 0, // Será calculado por calcularDiasUteisDecorridos
         percentualMeta: 0, // Será calculado baseado no realizado
         nps: 0, // Será atualizado por carregarNPSReal
         vendas: {
@@ -933,6 +958,12 @@ export default {
           meta_diaria: colab.meta_diaria || 0,
           id_eyal: colab.id_eyal
         };
+      })
+      // Ordenar alfabeticamente por nome (garantia adicional caso o backend não ordene)
+      .sort((a, b) => {
+        const nomeA = (a.nome || '').toUpperCase();
+        const nomeB = (b.nome || '').toUpperCase();
+        return nomeA.localeCompare(nomeB);
       });
 
       console.log('=== RESULTADO DO PROCESSAMENTO ===');
@@ -1021,7 +1052,9 @@ export default {
             diasTrabalhados: colaborador.dias_trabalhados || 0,
             diasFalta: colaborador.dias_de_falta || 0,
             totalRealizado: 0, // Será preenchido por carregarDadosRealizado
-            realizadoDia: 0, // Será calculado baseado na performance
+            realizadoDia: 0, // Será atualizado por carregarProducaoDiaAnterior (D-1)
+            producaoMediaDia: 0, // Será calculado por carregarDadosRealizado (média do período)
+            diasUteisDecorridos: 0, // Será calculado por calcularDiasUteisDecorridos
             percentualMeta: 0, // Será calculado quando tivermos dados de realizado
             nps: 0, // Será atualizado por carregarNPSReal
             // Campos de vendas - serão atualizados por carregarVendasReais
@@ -1100,7 +1133,9 @@ export default {
           diasTrabalhados: metaAtual.dias_trabalhados || 0,
           diasFalta: metaAtual.dias_de_falta || 0,
           totalRealizado: 0, // Será preenchido por carregarDadosRealizado
-          realizadoDia: 0, // Será calculado baseado na performance
+          realizadoDia: 0, // Será atualizado por carregarProducaoDiaAnterior (D-1)
+          producaoMediaDia: 0, // Será calculado por carregarDadosRealizado (média do período)
+          diasUteisDecorridos: 0, // Será calculado por calcularDiasUteisDecorridos
           percentualMeta: 0, // Será calculado quando tivermos dados de realizado
           nps: 0, // Será atualizado por carregarNPSReal
           // Campos de vendas - serão atualizados por carregarVendasReais
@@ -1173,11 +1208,22 @@ export default {
             ? (totalRealizado / this.dadosColaborador.metaTotal) * 100 
             : 0;
 
-          // Calcula o realizado diário baseado na performance atual
-          const diasDecorridos = new Date().getDate();
-          this.dadosColaborador.realizadoDia = diasDecorridos > 0 
-            ? Math.round((totalRealizado / diasDecorridos) * 100) / 100
+          // ✅ Calcular produção média diária usando DIAS ÚTEIS trabalhados até hoje
+          // IMPORTANTE: diasTrabalhados na tabela é o TOTAL do mês (ex: 22 dias úteis)
+          // Precisamos calcular quantos dias úteis já passaram até hoje
+          const diasUteisDecorridos = this.calcularDiasUteisDecorridos();
+          this.dadosColaborador.diasUteisDecorridos = diasUteisDecorridos; // Armazena para usar no template
+          this.dadosColaborador.producaoMediaDia = diasUteisDecorridos > 0 
+            ? Math.round((totalRealizado / diasUteisDecorridos) * 100) / 100
             : 0;
+          
+          console.log(`📊 Produção Média Dia calculada: ${this.dadosColaborador.producaoMediaDia}`);
+          console.log(`   Total Realizado: ${totalRealizado}`);
+          console.log(`   Dias Úteis Decorridos (seg-sex): ${diasUteisDecorridos}`);
+          console.log(`   Dias Trabalhados Total do Mês: ${this.dadosColaborador.diasTrabalhados || 0}`);
+
+          // ✅ NOVO: Buscar produção do dia anterior (D-1) - dados reais do painel
+          await this.carregarProducaoDiaAnterior(idEyal);
 
           // ✅ NOVO: Buscar vendas REAIS da tabela basecampanhas
           await this.carregarVendasReais(idEyal);
@@ -1188,13 +1234,9 @@ export default {
           // ✅ NOVO: Buscar ORÇAMENTOS REAIS da tabela orcamentos
           await this.carregarOrcamentosReais(idEyal);
 
-          // Atualiza comissão baseada na performance - ZERADO até implementar cálculo real
-          const percentualPerformance = this.dadosColaborador.percentualMeta / 100;
-          this.dadosColaborador.comissao = {
-            projecaoMeta: 0, // TODO: Implementar cálculo real baseado em regras de negócio
-            campanhas: 0 // TODO: Implementar cálculo real baseado em regras de negócio
-          };
-          
+          // ✅ NOVO: Buscar COMISSÕES REAIS da API de comissão
+          await this.carregarComissoesReais(idEyal);
+
           // Cria categorias baseadas nos dados de realizado
           const categoriasDoBackend = Object.entries(dadosRealizado)
             .filter(([key]) => key !== 'TOTAL_GERAL' && 
@@ -1376,6 +1418,56 @@ export default {
       }
     },
 
+    async carregarProducaoDiaAnterior(idEyal) {
+      try {
+        console.log('📅 Carregando produção D-1 (dia anterior) para:', idEyal);
+        
+        // Usar novo endpoint específico para D-1
+        const urlProducao = `${API_BASE_URL}/realizado/painel/dia-anterior/${idEyal}`;
+        console.log('🔍 Chamando:', urlProducao);
+        
+        const response = await fetch(urlProducao);
+        
+        if (response.ok) {
+          const resultado = await response.json();
+          console.log('✅ Produção D-1 recebida:', resultado);
+          
+          if (resultado.success && resultado.producao_dia) {
+            // Extrair produção do dia anterior
+            const producaoDia = resultado.producao_dia.valor || 0;
+            const dataRef = resultado.producao_dia.data_referencia;
+            
+            this.dadosColaborador.realizadoDia = producaoDia;
+            
+            console.log(`✅ Produção D-1 aplicada: ${producaoDia} (Data ref: ${dataRef})`);
+          } else {
+            console.warn('⚠️ Resposta sem dados de produção D-1');
+            this.calcularMediaDiaria();
+          }
+        } else {
+          const errorText = await response.text();
+          console.warn('⚠️ Erro ao buscar D-1:', response.status, errorText);
+          // Fallback: calcular média
+          this.calcularMediaDiaria();
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar produção D-1:', error);
+        // Fallback: calcular média
+        this.calcularMediaDiaria();
+      }
+    },
+
+    calcularMediaDiaria() {
+      // Método auxiliar para calcular média quando D-1 não está disponível
+      const diasDecorridos = new Date().getDate();
+      const totalRealizado = this.dadosColaborador.totalRealizado || 0;
+      this.dadosColaborador.realizadoDia = diasDecorridos > 0 
+        ? Math.round((totalRealizado / diasDecorridos) * 100) / 100
+        : 0;
+      
+      console.log(`ℹ️ Usando média diária como fallback: ${this.dadosColaborador.realizadoDia}`);
+    },
+
     async carregarOrcamentosReais(idEyal) {
       try {
         // Converter mes_ref de 'YYYY-MM-DD' para 'YYYY-MM'
@@ -1447,6 +1539,59 @@ export default {
         this.dadosColaborador.orcamentosConfirmados = 0;
         this.dadosColaborador.orcamentosPendentes = 0;
         this.dadosColaborador.taxaConfirmacao = 0;
+      }
+    },
+
+    // ✅ NOVO: Carregar comissões REAIS da API
+    async carregarComissoesReais(idEyal) {
+      try {
+        const mesRef = this.mesSelecionado || new Date().toISOString().slice(0, 7);
+        const urlComissao = `${API_BASE_URL}/comissao/resumo/${idEyal}?mes_ref=${mesRef}`;
+        
+        console.log('🎯 [COMISSÃO] Buscando comissão:', urlComissao);
+        
+        const responseComissao = await fetch(urlComissao);
+
+        if (responseComissao.ok) {
+          const dadosComissao = await responseComissao.json();
+          console.log('✅ Dados de comissão recebidos:', dadosComissao);
+
+          // ✅ Usar dados REAIS da API de comissão
+          this.dadosColaborador.comissao = {
+            projecaoMeta: dadosComissao.projecao_meta || 0,
+            campanhas: dadosComissao.campanhas || 0,
+            total: dadosComissao.total_comissao || 0,
+            quantidade_vendas: dadosComissao.quantidade_vendas || 0
+          };
+
+          console.log('✅ COMISSÕES REAIS aplicadas:', {
+            total: this.formatarMoeda(this.dadosColaborador.comissao.total),
+            projecaoMeta: this.formatarMoeda(this.dadosColaborador.comissao.projecaoMeta),
+            campanhas: this.formatarMoeda(this.dadosColaborador.comissao.campanhas),
+            vendas: this.dadosColaborador.comissao.quantidade_vendas
+          });
+        } else {
+          const errorText = await responseComissao.text();
+          console.error('❌ Erro ao buscar comissão:', responseComissao.status, errorText);
+          
+          // Valores zerados em caso de erro
+          this.dadosColaborador.comissao = {
+            projecaoMeta: 0,
+            campanhas: 0,
+            total: 0,
+            quantidade_vendas: 0
+          };
+        }
+      } catch (error) {
+        console.error('❌ Exceção ao carregar comissão:', error);
+        
+        // Valores zerados em caso de erro
+        this.dadosColaborador.comissao = {
+          projecaoMeta: 0,
+          campanhas: 0,
+          total: 0,
+          quantidade_vendas: 0
+        };
       }
     },
     
@@ -1592,6 +1737,32 @@ export default {
       
       // Se o mês ainda não começou, retornar 0
       return 0;
+    },
+
+    // Calcula quantos dias ÚTEIS (segunda a sábado) já passaram até ONTEM (D-1)
+    calcularDiasUteisDecorridos() {
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const mes = hoje.getMonth();
+      const diaAtual = hoje.getDate();
+      
+      let diasUteis = 0;
+      
+      // Percorre do dia 1 até o dia ANTERIOR (ontem), não até hoje
+      // Pois a média é sempre de D-1, não inclui o dia atual
+      const diaLimite = diaAtual - 1; // Sempre calcular até ontem
+      
+      for (let dia = 1; dia <= diaLimite; dia++) {
+        const data = new Date(ano, mes, dia);
+        const diaDaSemana = data.getDay(); // 0 = Domingo
+        
+        // Conta segunda (1) a sábado (6), exceto domingo (0)
+        if (diaDaSemana >= 1 && diaDaSemana <= 6) {
+          diasUteis++;
+        }
+      }
+      
+      return diasUteis;
     },
 
     // Método para obter ícone específico de cada categoria
@@ -1972,6 +2143,10 @@ export default {
 .kpi-card.media-diaria .kpi-icon,
 .kpi-card.esperado-dia .kpi-icon {
   background: linear-gradient(135deg, #9c27b0, #673ab7);
+}
+
+.kpi-card.producao-media .kpi-icon {
+  background: linear-gradient(135deg, #00bcd4, #0097a7);
 }
 
 .kpi-card.nps .kpi-icon {

@@ -94,8 +94,11 @@ def get_colaboradores_com_metas(db: Session = Depends(get_db)):
             resultado.append(colaborador)
             colaboradores_processados.add(meta.cpf)
     
-    print(f"--- [ROTA METAS] Processados {len(resultado)} colaboradores únicos ---")
-    return resultado
+    # Ordenar alfabeticamente por nome
+    resultado_ordenado = sorted(resultado, key=lambda x: x['nome'].upper() if x['nome'] else '')
+    
+    print(f"--- [ROTA METAS] Processados {len(resultado_ordenado)} colaboradores únicos (ordenados alfabeticamente) ---")
+    return resultado_ordenado
 
 
 @router.get("/minha-meta", response_model=List[MetaColaboradorSchema])

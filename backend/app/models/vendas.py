@@ -36,6 +36,7 @@ class BaseCampanhas(Base):
     cod_paciente = Column(String(20), nullable=False, comment="Código do paciente")
     valor_original_proc = Column(Numeric(12, 4), comment="Valor do procedimento")
     unidade = Column(String(50), comment="Unidade: OPERADOR, SITE, WHATSAPP")
+    filial = Column(String(100), comment="Filial/Unidade física: CENTRAL DE MARCAÇÕES, etc.")
     
     # Chaves primárias compostas
     cod_agenda = Column(String(50), nullable=False, comment="Código da agenda (PK)")

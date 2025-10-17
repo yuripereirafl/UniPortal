@@ -310,10 +310,14 @@
 export default {
   name: 'VisaoMetaUnidade',
   data() {
+    // Calcular mês atual no formato YYYY-MM
+    const dataAtual = new Date();
+    const mesAtual = `${dataAtual.getFullYear()}-${String(dataAtual.getMonth() + 1).padStart(2, '0')}`;
+    
     return {
       carregando: false,
       unidadeSelecionada: '',
-      dataFiltro: '2025-09', // Formato YYYY-MM - setembro onde há dados
+      dataFiltro: mesAtual, // Formato YYYY-MM - mês atual automaticamente
       
       // Dados da unidade
       dadosUnidade: {
@@ -391,8 +395,8 @@ export default {
     async carregarDadosUnidade() {
       this.carregando = true;
       try {
-        // Buscar dados reais da API usando setembro (onde há dados disponíveis)
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/dashboard?mes_ref=2025-09`);
+        // Buscar dados reais da API usando o mês atual (dataFiltro)
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/dashboard?mes_ref=${this.dataFiltro}`);
         
         if (!response.ok) {
           throw new Error(`Erro ${response.status}: ${response.statusText}`);
@@ -456,10 +460,8 @@ export default {
         
         if (this.dataFiltro) {
           params.append('mes_ref', this.dataFiltro);
-        } else {
-          // Se não houver filtro de data, usar setembro onde há dados
-          params.append('mes_ref', '2025-09');
         }
+        // Se não houver filtro, o backend já usa mês atual como padrão
         
         if (params.toString()) {
           url += '?' + params.toString();
@@ -522,7 +524,7 @@ export default {
     async carregarRankings() {
       try {
         // Construir URL com filtros para o novo endpoint
-        let url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/rankings-top10?mes_ref=${this.periodoSelecionado}`;
+        let url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/rankings-top10?mes_ref=${this.dataFiltro}`;
         
         // Adicionar filtro de unidade se selecionada
         if (this.unidadeSelecionada && this.unidadeSelecionada !== 'Todas') {

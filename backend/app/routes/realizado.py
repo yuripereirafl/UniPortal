@@ -148,6 +148,101 @@ def get_realizado_painel(
         )
 
 
+@router.get("/painel/dia-anterior/{identificador}")
+def get_producao_dia_anterior(
+    identificador: str,
+    db: Session = Depends(get_db)
+):
+    """
+    📅 Produção do Dia Anterior (D-1)
+    
+    Retorna a produção ESPECÍFICA do dia anterior (ontem).
+    Calcula: Realizado até D-1 - Realizado até D-2
+    
+    Isso mostra quanto foi produzido APENAS no dia de ontem.
+    
+    Args:
+        identificador: ID Eyal ou CPF do colaborador
+        
+    Returns:
+        Produção líquida do dia anterior (D-1 - D-2)
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        print(f"=== Calculando produção D-1 para {identificador} ===")
+        
+        # Construir query base
+        base_query = db.query(PainelResultadosDiarios)
+        
+        # Filtrar por ID Eyal ou CPF
+        if len(identificador) == 11 or len(identificador) == 14:  # CPF
+            base_query = base_query.filter(PainelResultadosDiarios.cpf == identificador)
+        else:  # ID Eyal
+            base_query = base_query.filter(PainelResultadosDiarios.id_eyal == identificador)
+        
+        # Buscar as 2 últimas cargas disponíveis (D-1 e D-2)
+        ultimas_cargas = base_query.order_by(
+            PainelResultadosDiarios.data_carga.desc()
+        ).limit(2).all()
+        
+        if not ultimas_cargas:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dados não encontrados para {identificador}"
+            )
+        
+        # Separar D-1 e D-2
+        realizado_d1 = ultimas_cargas[0] if len(ultimas_cargas) > 0 else None
+        realizado_d2 = ultimas_cargas[1] if len(ultimas_cargas) > 1 else None
+        
+        if not realizado_d1:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dados D-1 não encontrados para {identificador}"
+            )
+        
+        # Valores acumulados
+        valor_d1 = float(realizado_d1.realizado_final or 0)
+        valor_d2 = float(realizado_d2.realizado_final or 0) if realizado_d2 else 0
+        
+        # Calcular produção do dia: D-1 - D-2
+        producao_dia = valor_d1 - valor_d2
+        
+        print(f"Realizado até D-1 ({realizado_d1.data_carga}): {valor_d1}")
+        print(f"Realizado até D-2 ({realizado_d2.data_carga if realizado_d2 else 'N/A'}): {valor_d2}")
+        print(f"Produção do dia: {producao_dia}")
+        
+        return {
+            "success": True,
+            "producao_dia": {
+                "valor": producao_dia,
+                "data_d1": str(realizado_d1.data_carga),
+                "data_d2": str(realizado_d2.data_carga) if realizado_d2 else None,
+                "realizado_ate_d1": valor_d1,
+                "realizado_ate_d2": valor_d2,
+                "mes_ref": str(realizado_d1.mes_ref),
+                "calculo": "Realizado até D-1 menos Realizado até D-2",
+                "observacao": "Produção líquida do dia anterior (apenas o que foi produzido em D-1)"
+            },
+            "colaborador": {
+                "id_eyal": realizado_d1.id_eyal,
+                "nome": realizado_d1.nome,
+                "cpf": realizado_d1.cpf
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar produção D-1: {str(e)}"
+        )
+
+
 @router.get("/painel/historico/{identificador}")
 def get_historico_realizado(
     identificador: str,
