@@ -261,8 +261,8 @@
             </div>
             <span class="kpi-titulo">Produção Dia</span>
           </div>
-          <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.realizadoDia || 0) }}</div>
-          <div class="kpi-sublabel">Dados D-1 (dia anterior)</div>
+          <div class="kpi-valor">{{ formatarMoeda(producaoDia) }}</div>
+          <div class="kpi-sublabel">Média por dia trabalhado</div>
         </div>
 
         <div class="kpi-card esperado-dia">
@@ -281,10 +281,10 @@
             <div class="kpi-icon">
               <i class="fas fa-chart-line"></i>
             </div>
-            <span class="kpi-titulo">Produção Média Dia</span>
+            <span class="kpi-titulo">Previsão de Atingimento</span>
           </div>
-          <div class="kpi-valor">{{ formatarMoeda(dadosColaborador.producaoMediaDia || 0) }}</div>
-          <div class="kpi-sublabel">Média D-1: {{ dadosColaborador.diasUteisDecorridos || 0 }} dias úteis</div>
+          <div class="kpi-valor">{{ formatarMoeda(previsaoAtingimento) }}</div>
+          <div class="kpi-sublabel">Projeção fim do mês</div>
         </div>
 
         <div class="kpi-card nps">
@@ -366,7 +366,7 @@
           <h4 class="detalhes-titulo">Detalhamento:</h4>
           <div class="detalhes-grid">
             <div class="detalhe-item">
-              <div class="detalhe-label">Projeção da Meta Realizada</div>
+              <div class="detalhe-label">Valor Pago Produção</div>
               <div class="detalhe-valor">{{ formatarMoeda(dadosColaborador.comissao?.projecaoMeta || 0) }}</div>
             </div>
             <div class="detalhe-item">
@@ -394,12 +394,12 @@
         <div class="projecoes-grid">
           <div class="projecao-card">
             <div class="projecao-label">Atingimento Atual</div>
-            <div class="projecao-valor">{{ (dadosColaborador.percentualMeta || 0).toFixed(2) }}%</div>
-            <div class="projecao-info">Até o momento</div>
+            <div class="projecao-valor">{{ percentualProjetado > 0 ? percentualProjetado.toFixed(2) : '0.00' }}%</div>
+            <div class="projecao-info">Previsão de atingimento</div>
           </div>
           <div class="projecao-card">
             <div class="projecao-label">Realizado Projetado</div>
-            <div class="projecao-valor">{{ formatarMoeda(calcularRealizadoProjetado()) }}</div>
+            <div class="projecao-valor">{{ formatarMoeda(previsaoAtingimento) }}</div>
             <div class="projecao-info">Estimativa fim do mês</div>
           </div>
         </div>
@@ -472,7 +472,7 @@
         </div>
       </div>
         -->
-      <!-- Histórico e Tendências -->
+      <!-- Histórico e Tendências
       <div class="historico-tendencias">
         <h3 class="section-title">
           <i class="fas fa-chart-area"></i>
@@ -500,7 +500,7 @@
           </div>
           
         </div>
-      </div>
+      </div>-->
     </div>
     </div> <!-- Fecha div !mostrarRanking -->
   </div> <!-- Fecha div meta-colaborador -->
@@ -613,6 +613,116 @@ export default {
         nome: pior.nome || '-',
         percentual: pior.meta ? ((pior.realizado / pior.meta) * 100).toFixed(1) : 0
       };
+    },
+
+    /**
+     * 🆕 Calcula a previsão de atingimento para o fim do mês
+     * Fórmula: (realizado_atual / dias_trabalhados) * dias_totais_do_mes
+     * 
+     * Regras de contagem:
+     * - Segunda a Sexta: 1 dia
+     * - Sábado: 0.5 dia
+     * - Domingo: 0 dia (não conta)
+     * 
+     * ⚠️ IMPORTANTE: Dados são sempre D-1 (dia anterior)
+     */
+    previsaoAtingimento() {
+      const realizado = this.dadosColaborador.totalRealizado || 0;
+      
+      if (realizado === 0) {
+        return 0;
+      }
+
+      const hoje = new Date();
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
+      
+      // ✅ Calcular até ONTEM (D-1), pois os dados são sempre do dia anterior
+      const ontem = new Date(hoje);
+      ontem.setDate(hoje.getDate() - 1);
+      
+      // 1️⃣ Calcular dias trabalhados até ONTEM (D-1)
+      const diasTrabalhadosAteOntem = this.calcularDiasTrabalhados(
+        new Date(anoAtual, mesAtual, 1),  // Primeiro dia do mês
+        ontem                              // Ontem (D-1)
+      );
+      
+      // 2️⃣ Calcular dias totais do mês
+      const ultimoDiaMes = new Date(anoAtual, mesAtual + 1, 0); // Último dia
+      const diasTotaisMes = this.calcularDiasTrabalhados(
+        new Date(anoAtual, mesAtual, 1),   // Primeiro dia do mês
+        ultimoDiaMes                        // Último dia do mês
+      );
+      
+      // 3️⃣ Calcular previsão
+      if (diasTrabalhadosAteOntem > 0 && diasTotaisMes > 0) {
+        const mediaProducaoDia = realizado / diasTrabalhadosAteOntem;
+        const previsao = mediaProducaoDia * diasTotaisMes;
+        return previsao;
+      }
+      
+      return 0;
+    },
+
+    /**
+     * 🆕 Calcula a produção média por dia trabalhado
+     * Fórmula: realizado_atual / dias_trabalhados_ate_ontem
+     * 
+     * Mesma lógica da previsão, mas retorna apenas a média diária
+     */
+    producaoDia() {
+      const realizado = this.dadosColaborador.totalRealizado || 0;
+      
+      if (realizado === 0) {
+        return 0;
+      }
+
+      const hoje = new Date();
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
+      
+      // Calcular até ONTEM (D-1)
+      const ontem = new Date(hoje);
+      ontem.setDate(hoje.getDate() - 1);
+      
+      const diasTrabalhadosAteOntem = this.calcularDiasTrabalhados(
+        new Date(anoAtual, mesAtual, 1),
+        ontem
+      );
+      
+      if (diasTrabalhadosAteOntem > 0) {
+        return realizado / diasTrabalhadosAteOntem;
+      }
+      
+      return 0;
+    },
+
+    /**
+     * 🆕 Calcula o percentual projetado (previsão de atingimento / meta)
+     * Usado na seção "PROJEÇÕES BASEADAS NA META"
+     * Fórmula: (previsaoAtingimento / metaTotal) * 100
+     */
+    percentualProjetado() {
+      const previsao = this.previsaoAtingimento;
+      const meta = this.dadosColaborador.metaTotal || 0;
+      
+      console.log('📊 [DEBUG] Calculando percentualProjetado:');
+      console.log('   Previsão de Atingimento:', previsao);
+      console.log('   Meta Total:', meta);
+      
+      if (meta === 0) {
+        console.log('   ⚠️ Meta é zero, retornando 0%');
+        return 0;
+      }
+      
+      const percentual = (previsao / meta) * 100;
+      console.log('   ✅ Percentual Projetado:', percentual.toFixed(2) + '%');
+      
+      return percentual;
+    },
+
+    colaboradorSelecionadoId() {
+      return this.colaboradorSelecionado || (this.colaboradorPreSelecionado && this.colaboradorPreSelecionado.cpf) || null;
     }
   },
   watch: {
@@ -1384,8 +1494,11 @@ export default {
           mesRef = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
         }
 
+        // Usar endpoint /nps/colaborador para buscar NPS individual da tabela resultadocsat
         const urlNPS = `${API_BASE_URL}/nps/colaborador/${idEyal}?mes_ref=${mesRef}`;
-        console.log('⭐ Carregando NPS REAL da resultadocsat:', urlNPS);
+
+        console.log('⭐ Carregando NPS INDIVIDUAL:', urlNPS);
+        console.log('   Cargo:', this.dadosColaborador.cargo);
 
         const responseNPS = await fetch(urlNPS);
 
@@ -1394,15 +1507,25 @@ export default {
           console.log('✅ Dados de NPS recebidos:', dadosNPS);
 
           if (dadosNPS.success && dadosNPS.nps_data && dadosNPS.nps_data.nps !== null) {
-            // ✅ Usar NPS REAL da tabela resultadocsat
+            // Usar NPS AGREGADO de ambas as tabelas (resultadocsat + nps_unidades)
             const npsValor = dadosNPS.nps_data.nps;
             this.dadosColaborador.nps = npsValor.toFixed(2);
 
-            console.log('✅ NPS REAL aplicado:', this.dadosColaborador.nps);
+            console.log('✅ NPS AGREGADO aplicado:', this.dadosColaborador.nps);
             console.log(`   📊 Detratores: ${dadosNPS.nps_data.qtd_detrator} (${dadosNPS.nps_data.percentuais.detratores}%)`);
             console.log(`   😐 Neutros: ${dadosNPS.nps_data.qtd_neutro} (${dadosNPS.nps_data.percentuais.neutros}%)`);
             console.log(`   😊 Promotores: ${dadosNPS.nps_data.qtd_promotor} (${dadosNPS.nps_data.percentuais.promotores}%)`);
             console.log(`   📝 Total avaliações: ${dadosNPS.nps_data.qtd_total}`);
+
+            // Mostrar detalhamento das fontes se disponível
+            if (dadosNPS.nps_data.detalhamento_fontes) {
+              const csat = dadosNPS.nps_data.detalhamento_fontes.resultadocsat;
+              const unidades = dadosNPS.nps_data.detalhamento_fontes.nps_unidades;
+
+              console.log('\n📋 DETALHAMENTO POR FONTE:');
+              console.log(`   🔹 ResultadoCSAT: NPS ${csat.nps} | Total: ${csat.qtd_total} avaliações`);
+              console.log(`   🔹 NPS Unidades: NPS ${unidades.nps} | Total: ${unidades.qtd_total} avaliações (${unidades.quantidade_unidades} unidades)`);
+            }
           } else {
             console.warn('⚠️ Nenhum dado de NPS encontrado para este colaborador/período');
             this.dadosColaborador.nps = 0;
@@ -1557,10 +1680,12 @@ export default {
           console.log('✅ Dados de comissão recebidos:', dadosComissao);
 
           // ✅ Usar dados REAIS da API de comissão
+          // pagamento_producao: vem da tabela pagamentos_meta (Valor Pago Produção)
+          // projecao_meta: comissão calculada (Campanhas)
           this.dadosColaborador.comissao = {
-            projecaoMeta: dadosComissao.projecao_meta || 0,
-            campanhas: dadosComissao.campanhas || 0,
-            total: dadosComissao.total_comissao || 0,
+            projecaoMeta: dadosComissao.pagamento_producao || 0,  // ✅ Valor Pago Produção (pagamentos_meta.pagamento_final)
+            campanhas: dadosComissao.projecao_meta || 0,  // ✅ Campanhas (comissão calculada)
+            total: dadosComissao.total_comissao || 0,  // Total da comissão
             quantidade_vendas: dadosComissao.quantidade_vendas || 0
           };
 
@@ -1763,6 +1888,43 @@ export default {
       }
       
       return diasUteis;
+    },
+
+    /**
+     * 🆕 Calcula dias trabalhados entre duas datas
+     * 
+     * Regras:
+     * - Segunda a Sexta (1-5): 1 dia
+     * - Sábado (6): 0.5 dia
+     * - Domingo (0): 0 dia
+     * 
+     * @param {Date} dataInicio - Data inicial (inclusiva)
+     * @param {Date} dataFim - Data final (inclusiva)
+     * @returns {number} - Total de dias trabalhados (pode ter decimais)
+     */
+    calcularDiasTrabalhados(dataInicio, dataFim) {
+      let diasTrabalhados = 0;
+      const dataAtual = new Date(dataInicio);
+      
+      // Loop dia por dia
+      while (dataAtual <= dataFim) {
+        const diaSemana = dataAtual.getDay();
+        
+        // Segunda a Sexta (1-5): 1 dia
+        if (diaSemana >= 1 && diaSemana <= 5) {
+          diasTrabalhados += 1;
+        }
+        // Sábado (6): 0.5 dia
+        else if (diaSemana === 6) {
+          diasTrabalhados += 0.5;
+        }
+        // Domingo (0): 0 dia (não adiciona nada)
+        
+        // Avança 1 dia
+        dataAtual.setDate(dataAtual.getDate() + 1);
+      }
+      
+      return diasTrabalhados;
     },
 
     // Método para obter ícone específico de cada categoria

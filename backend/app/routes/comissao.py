@@ -16,9 +16,12 @@ from typing import Optional
 from collections import defaultdict
 
 from app.database import get_db
+from app.config import settings
 from app.models.metas_colaboradores import MetaColaborador
 from app.models.vendas import BaseCampanhas
 from app.models.dados_camp_proc_historico import DadosCampProcHistorico
+from app.models.pagamentos_meta import PagamentoMeta
+from app.models.resultados_campanha import ResultadoCampanha
 from app.schemas.comissao import (
     ComissaoColaboradorResponse,
     ComissaoPorCategoria,
@@ -35,6 +38,32 @@ router = APIRouter(
 )
 
 
+# ========================================
+# FUNÇÕES AUXILIARES
+# ========================================
+
+def verificar_cargo_em_lista(cargo: str, lista_cargos: list) -> bool:
+    """
+    Verifica se o cargo do colaborador está na lista configurada.
+    Faz busca case-insensitive e parcial.
+
+    Args:
+        cargo: Cargo do colaborador (ex: "COORDENADOR DE VENDAS")
+        lista_cargos: Lista de cargos configurada (ex: ["COORDENADOR", "GERENTE"])
+
+    Returns:
+        bool: True se o cargo corresponde a algum da lista
+    """
+    if not cargo:
+        return False
+
+    cargo_lower = cargo.lower()
+    for cargo_config in lista_cargos:
+        if cargo_config.lower() in cargo_lower:
+            return True
+    return False
+
+
 @router.get(
     "/resumo/{id_eyal}",
     response_model=ComissaoResumo,
@@ -47,20 +76,95 @@ async def get_comissao_resumo(
 ):
     """
     Retorna resumo simplificado da comissão (para cards no dashboard)
+
+    Busca valores de:
+    - campanhas: tabela resultados_campanha (valor_a_pagar)
+    - pagamento_producao: tabela pagamentos_meta (pagamento_final)
+    - quantidade_vendas: calculado a partir das vendas
     """
-    # Redirecionar para cálculo completo e extrair resumo
-    comissao_completa = await calcular_comissao_colaborador(
-        id_eyal=id_eyal,
-        mes_ref=mes_ref,
-        incluir_detalhes=False,
-        db=db
-    )
-    
+    print(f"\n[COMISSÃO RESUMO] Buscando resumo para {id_eyal}")
+
+    # Determinar mês de referência (SEMPRE usar dia 1)
+    if mes_ref:
+        if len(mes_ref) == 7:  # YYYY-MM
+            mes_referencia = datetime.strptime(mes_ref, "%Y-%m").date()
+        else:  # YYYY-MM-DD
+            mes_referencia = datetime.strptime(mes_ref, "%Y-%m-%d").date()
+        # Garantir que sempre seja dia 1
+        mes_referencia = mes_referencia.replace(day=1)
+    else:
+        hoje = date.today()
+        mes_referencia = date(hoje.year, hoje.month, 1)
+
+    print(f"[COMISSÃO RESUMO] Mês de referência: {mes_referencia}")
+
+    # 1. Buscar valor de campanhas da tabela resultados_campanha
+    valor_campanhas = 0.0
+    try:
+        resultado_campanha = db.query(ResultadoCampanha).filter(
+            ResultadoCampanha.id_eyal == id_eyal,
+            ResultadoCampanha.mes_ref == mes_referencia
+        ).first()
+
+        if resultado_campanha and resultado_campanha.valor_a_pagar:
+            valor_campanhas = float(resultado_campanha.valor_a_pagar)
+            print(f"✅ [COMISSÃO RESUMO] Valor campanhas encontrado: R$ {valor_campanhas}")
+        else:
+            print(f"⚠️ [COMISSÃO RESUMO] Nenhum resultado de campanha encontrado para {id_eyal} em {mes_referencia}")
+    except Exception as e:
+        print(f"❌ [COMISSÃO RESUMO] Erro ao buscar resultado campanha: {e}")
+        valor_campanhas = 0.0
+
+    # 2. Buscar pagamento de produção da tabela pagamentos_meta
+    pagamento_producao = 0.0
+    try:
+        pagamento = db.query(PagamentoMeta).filter(
+            PagamentoMeta.id_eyal == id_eyal,
+            PagamentoMeta.mes_ref == mes_referencia
+        ).first()
+
+        if pagamento and pagamento.pagamento_final:
+            pagamento_producao = float(pagamento.pagamento_final)
+            print(f"✅ [COMISSÃO RESUMO] Pagamento produção encontrado: R$ {pagamento_producao}")
+        else:
+            print(f"⚠️ [COMISSÃO RESUMO] Nenhum pagamento encontrado para {id_eyal} em {mes_referencia}")
+    except Exception as e:
+        print(f"❌ [COMISSÃO RESUMO] Erro ao buscar pagamento: {e}")
+        pagamento_producao = 0.0
+
+    # 3. Calcular quantidade de vendas (usar endpoint completo só para isso)
+    quantidade_vendas = 0
+    total_comissao = 0.0
+    try:
+        comissao_completa = await calcular_comissao_colaborador(
+            id_eyal=id_eyal,
+            mes_ref=mes_ref,
+            incluir_detalhes=False,
+            db=db
+        )
+        quantidade_vendas = comissao_completa.total_procedimentos
+        total_comissao = comissao_completa.total_comissao
+    except Exception as e:
+        print(f"⚠️ [COMISSÃO RESUMO] Não foi possível calcular quantidade de vendas: {e}")
+        quantidade_vendas = 0
+        total_comissao = 0.0
+
+    # Total da comissão é a soma de campanhas + pagamento produção
+    total_final = valor_campanhas + pagamento_producao
+
+    print(f"[COMISSÃO RESUMO] Resumo final:")
+    print(f"  - Total comissão: R$ {total_final}")
+    print(f"  - Projeção meta: R$ {valor_campanhas}")
+    print(f"  - Campanhas: R$ {valor_campanhas}")
+    print(f"  - Pagamento produção: R$ {pagamento_producao}")
+    print(f"  - Quantidade vendas: {quantidade_vendas}")
+
     return ComissaoResumo(
-        total_comissao=comissao_completa.total_comissao,
-        projecao_meta=comissao_completa.projecao_meta_realizada,
-        campanhas=comissao_completa.campanhas,
-        quantidade_vendas=comissao_completa.total_procedimentos
+        total_comissao=total_final,
+        projecao_meta=valor_campanhas,  # Valor da campanha
+        campanhas=valor_campanhas,      # Valor da campanha (mesmo que projecao_meta)
+        quantidade_vendas=quantidade_vendas,
+        pagamento_producao=pagamento_producao
     )
 
 
@@ -133,10 +237,15 @@ async def calcular_comissao_colaborador(
         
         # 3. Determinar IDs para busca de vendas (hierarquia)
         ids_para_buscar = [id_eyal]  # Sempre inclui o próprio colaborador
-        cargo_lower = cargo.lower()
-        
-        # Se é líder (coordenador, gerente, supervisor), buscar equipe
-        if any(x in cargo_lower for x in ['coordenador', 'gerente', 'supervisor', 'monitor']):
+
+        # Verificar se é líder (cargos de filial completa ou hierarquia)
+        eh_lider = (
+            verificar_cargo_em_lista(cargo, settings.CARGOS_FILIAL_COMPLETA) or
+            verificar_cargo_em_lista(cargo, settings.CARGOS_HIERARQUIA)
+        )
+
+        # Se é líder, buscar equipe
+        if eh_lider:
             print(f"[COMISSÃO] Colaborador é LÍDER - buscando vendas da equipe")
             
             # Nível 1: Liderados diretos
@@ -153,27 +262,27 @@ async def calcular_comissao_colaborador(
                     ids_para_buscar.append(liderado.id_eyal)
                     
                 # Se o liderado é supervisor, guardar nome para busca nível 2
-                liderado_cargo_lower = (liderado.cargo or "").lower()
-                if 'supervisor' in liderado_cargo_lower or 'monitor' in liderado_cargo_lower:
+                if verificar_cargo_em_lista(liderado.cargo, settings.CARGOS_HIERARQUIA):
                     nomes_supervisores.append(liderado.nome)
-            
-            # Nível 2: Equipes dos supervisores (apenas para coordenadores/gerentes)
-            if nomes_supervisores and ('coordenador' in cargo_lower or 'gerente' in cargo_lower):
+
+            # Nível 2: Equipes dos supervisores (apenas para cargos de filial completa)
+            eh_cargo_filial = verificar_cargo_em_lista(cargo, settings.CARGOS_FILIAL_COMPLETA)
+            if nomes_supervisores and eh_cargo_filial:
                 print(f"[COMISSÃO] Nível 2: Buscando equipes de {len(nomes_supervisores)} supervisores")
-                
+
                 liderados_nivel2 = db.query(MetaColaborador).filter(
                     MetaColaborador.lider_direto.in_(nomes_supervisores),
                     MetaColaborador.mes_ref == mes_ref_date
                 ).all()
-                
+
                 print(f"[COMISSÃO] Nível 2: {len(liderados_nivel2)} vendedores encontrados")
-                
+
                 for vendedor in liderados_nivel2:
                     if vendedor.id_eyal:
                         ids_para_buscar.append(vendedor.id_eyal)
-            
-            # ADM: Funcionários sem equipe na mesma unidade (apenas coordenadores/gerentes)
-            if 'coordenador' in cargo_lower or 'gerente' in cargo_lower:
+
+            # ADM: Funcionários sem equipe na mesma unidade (apenas para cargos de filial completa)
+            if eh_cargo_filial:
                 unidade_coord = colaborador.unidade
                 print(f"[COMISSÃO] ADM: Buscando funcionários sem equipe na unidade '{unidade_coord}'")
                 
@@ -195,48 +304,86 @@ async def calcular_comissao_colaborador(
                         print(f"[COMISSÃO] ADM: ✅ {func_adm.nome} (ID: {func_adm.id_eyal})")
         
         print(f"[COMISSÃO] Total de IDs para buscar vendas: {len(ids_para_buscar)}")
-        
-        # 4. Buscar vendas
-        cargo_lower = (cargo or "").lower()
-        eh_gerente = 'gerente' in cargo_lower
-        eh_coordenador = 'coordenador' in cargo_lower
-        eh_supervisor = 'supervisor' in cargo_lower or 'monitor' in cargo_lower
-        
+
+        # 4. Buscar vendas - Usando configuração de cargos
         # ========================================
-        # GERENTES: TODA A FILIAL
+        # VERIFICAÇÃO DE CARGOS CONFIGURÁVEIS
         # ========================================
-        if eh_gerente:
-            print(f"[COMISSÃO] 🏢 GERENTE: Buscando TODAS vendas da filial '{colaborador.unidade}'")
-            
-            vendas = db.query(BaseCampanhas).filter(
-                BaseCampanhas.filial == colaborador.unidade,
-                extract('year', BaseCampanhas.mes) == mes_referencia.year,
-                extract('month', BaseCampanhas.mes) == mes_referencia.month
+        eh_cargo_filial_completa = verificar_cargo_em_lista(cargo, settings.CARGOS_FILIAL_COMPLETA)
+        eh_cargo_hierarquia = verificar_cargo_em_lista(cargo, settings.CARGOS_HIERARQUIA)
+        eh_cargo_vendas_proprias = verificar_cargo_em_lista(cargo, settings.CARGOS_VENDAS_PROPRIAS)
+
+        # ⭐ REGRA ESPECIAL: CENTRAL DE MARCAÇÕES
+        # Coordenadores/Monitores veem filial completa FORA da CENTRAL
+        # Dentro da CENTRAL, veem apenas hierarquia
+        unidade_upper = (colaborador.unidade or "").upper()
+        eh_central_marcacoes = 'CENTRAL' in unidade_upper and ('MARCAÇÕES' in unidade_upper or 'MARCACOES' in unidade_upper)
+        eh_gerente = verificar_cargo_em_lista(cargo, ["GERENTE"])
+
+        # Aplicar filial completa APENAS se:
+        # 1. É GERENTE (sempre vê toda filial) OU
+        # 2. É cargo de filial completa E NÃO é CENTRAL DE MARCAÇÕES (fora da Central vê filial inteira)
+        aplicar_filial_completa = eh_gerente or (eh_cargo_filial_completa and not eh_central_marcacoes)
+
+        print(f"[COMISSÃO] 🔍 Classificação do cargo '{cargo}':")
+        print(f"[COMISSÃO]    Cargo permite filial completa: {eh_cargo_filial_completa}")
+        print(f"[COMISSÃO]    É GERENTE: {eh_gerente}")
+        print(f"[COMISSÃO]    É CENTRAL DE MARCAÇÕES: {eh_central_marcacoes}")
+        print(f"[COMISSÃO]    ⭐ Aplicar FILIAL COMPLETA: {aplicar_filial_completa}")
+        print(f"[COMISSÃO]    Hierarquia: {eh_cargo_hierarquia}")
+        print(f"[COMISSÃO]    Vendas Próprias: {eh_cargo_vendas_proprias}")
+
+        # ========================================
+        # FILIAL COMPLETA (Gerente OU Coordenador/Monitor FORA da CENTRAL)
+        # ========================================
+        if aplicar_filial_completa:
+            print(f"[COMISSÃO] 🏢 FILIAL COMPLETA: Buscando TODAS vendas da filial '{colaborador.unidade}'")
+
+            # 1. Buscar todos colaboradores da unidade no mês
+            colaboradores_unidade = db.query(MetaColaborador).filter(
+                MetaColaborador.unidade == colaborador.unidade,
+                MetaColaborador.mes_ref == mes_referencia.strftime('%Y-%m-01')
             ).all()
+
+            # 2. Extrair IDs
+            ids_colaboradores = [c.id_eyal for c in colaboradores_unidade if c.id_eyal]
+            print(f"[COMISSÃO]    📋 Encontrados {len(ids_colaboradores)} colaboradores na unidade '{colaborador.unidade}'")
+
+            if not ids_colaboradores:
+                print(f"[COMISSÃO]    ⚠️ Nenhum colaborador encontrado na unidade!")
+                vendas = []
+            else:
+                # 3. Buscar vendas desses colaboradores
+                vendas = db.query(BaseCampanhas).filter(
+                    BaseCampanhas.cod_usuario.in_(ids_colaboradores),
+                    extract('year', BaseCampanhas.mes) == mes_referencia.year,
+                    extract('month', BaseCampanhas.mes) == mes_referencia.month
+                ).all()
             
             ids_unicos = set([v.cod_usuario for v in vendas])
             print(f"[COMISSÃO]    ✅ Total vendas: {len(vendas)} | Vendedores: {len(ids_unicos)}")
         
         # ========================================
-        # COORDENADORES/SUPERVISORES: APENAS HIERARQUIA
+        # HIERARQUIA (Coordenador fora da Central OU Supervisor/Monitor)
         # ========================================
-        elif eh_coordenador or eh_supervisor:
-            print(f"[COMISSÃO] 👥 {cargo_lower.upper()}: Apenas hierarquia cadastrada")
-            
+        elif eh_cargo_hierarquia or eh_cargo_filial_completa:
+            # Se chegou aqui sendo cargo_filial_completa, é porque NÃO é Central
+            print(f"[COMISSÃO] 👥 HIERARQUIA: Apenas equipe cadastrada")
+
             # Buscar vendas da hierarquia
             vendas = db.query(BaseCampanhas).filter(
                 BaseCampanhas.cod_usuario.in_(ids_para_buscar),
                 extract('year', BaseCampanhas.mes) == mes_referencia.year,
                 extract('month', BaseCampanhas.mes) == mes_referencia.month
             ).all()
-            
+
             print(f"[COMISSÃO]    ✅ TOTAL: {len(vendas)} vendas da hierarquia")
-        
+
         # ========================================
-        # ATENDENTES: VENDAS PRÓPRIAS
+        # CARGOS DE VENDAS PRÓPRIAS (Atendente, Estagiário, etc)
         # ========================================
         else:
-            print(f"[COMISSÃO] 👤 ATENDENTE: Vendas próprias")
+            print(f"[COMISSÃO] 👤 VENDAS PRÓPRIAS: Apenas vendas do colaborador")
             
             vendas = db.query(BaseCampanhas).filter(
                 BaseCampanhas.cod_usuario.in_(ids_para_buscar),
@@ -359,6 +506,51 @@ async def calcular_comissao_colaborador(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao calcular comissão: {str(e)}")
+
+
+# ===============================================================================
+# ENDPOINT DE CONFIGURAÇÃO
+# ===============================================================================
+
+@router.get(
+    "/config/cargos",
+    summary="Consultar configuração de cargos para comissões"
+)
+async def get_config_cargos():
+    """
+    Retorna a configuração atual de cargos para cálculo de comissões.
+
+    Mostra quais cargos estão configurados em cada categoria:
+    - Filial Completa: Recebem sobre TODAS as vendas da filial
+    - Hierarquia: Recebem sobre vendas da equipe (liderados)
+    - Vendas Próprias: Recebem apenas sobre vendas próprias
+
+    Útil para:
+    - Diagnóstico de regras aplicadas
+    - Validação de configurações
+    - Documentação do sistema
+    """
+    return {
+        "filial_completa": {
+            "descricao": "Cargos que recebem comissão sobre TODAS as vendas da FILIAL",
+            "base_calculo": "basecampanhas.filial = unidade",
+            "inclui_desligados": True,
+            "cargos": settings.CARGOS_FILIAL_COMPLETA
+        },
+        "hierarquia": {
+            "descricao": "Cargos que recebem comissão sobre vendas da HIERARQUIA (equipe)",
+            "base_calculo": "basecampanhas.cod_usuario IN (ids_hierarquia)",
+            "inclui_desligados": False,
+            "cargos": settings.CARGOS_HIERARQUIA
+        },
+        "vendas_proprias": {
+            "descricao": "Cargos que recebem comissão apenas sobre VENDAS PRÓPRIAS",
+            "base_calculo": "basecampanhas.cod_usuario = id_eyal",
+            "inclui_desligados": False,
+            "cargos": settings.CARGOS_VENDAS_PROPRIAS
+        },
+        "nota": "A verificação é case-insensitive e parcial. Ex: 'GERENTE' corresponde a 'Gerente de Vendas'"
+    }
 
 
 # ===============================================================================

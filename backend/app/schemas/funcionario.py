@@ -1,11 +1,14 @@
 from typing import List, Optional, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from app.schemas.sistema import Sistema
 from app.schemas.setor import SetorOut
 from app.schemas.grupo_email import GrupoEmailOut
 from .grupo_pasta import GrupoPastaOut
 from .grupo_whatsapp import GrupoWhatsapp as GrupoWhatsappOut
 from app.schemas.cargo import CargoOut
+
+# Tipos de contrato permitidos
+TIPOS_CONTRATO = ["CLT", "PJ", "Genérico", "Terceirizado"]
 
 
 class FuncionarioBase(BaseModel):
@@ -32,7 +35,11 @@ class FuncionarioBase(BaseModel):
     id_eyal: Optional[str] = None
 
 class FuncionarioCreate(FuncionarioBase):
-    pass
+    @validator('tipo_contrato')
+    def validar_tipo_contrato(cls, v):
+        if v is not None and v not in TIPOS_CONTRATO:
+            raise ValueError(f'Tipo de contrato inválido. Valores permitidos: {", ".join(TIPOS_CONTRATO)}')
+        return v
 
 class FuncionarioUpdate(BaseModel):
     """Schema para atualizações - todos os campos são opcionais"""
@@ -61,6 +68,12 @@ class FuncionarioUpdate(BaseModel):
     tipo_pgto: Optional[str] = None
     lider_direto_id: Optional[int] = None
     id_eyal: Optional[str] = None
+
+    @validator('tipo_contrato')
+    def validar_tipo_contrato(cls, v):
+        if v is not None and v not in TIPOS_CONTRATO:
+            raise ValueError(f'Tipo de contrato inválido. Valores permitidos: {", ".join(TIPOS_CONTRATO)}')
+        return v
 
 class Funcionario(FuncionarioBase):
     id: int

@@ -45,12 +45,26 @@ def _hash_password(password: str) -> str:
 @router.post('/funcionarios/', response_model=FuncionarioSchema)
 def adicionar_funcionario(funcionario: FuncionarioCreate):
     db = SessionLocal()
+
+    # Lista de tipos de contrato que não precisam de CPF, celular e data de admissão
+    campos_opcionais = ['genérico', 'generico', 'terceirizado']
+
+    # Se o tipo de contrato for Genérico ou Terceirizado, remove campos opcionais
+    if funcionario.tipo_contrato and funcionario.tipo_contrato.lower() in campos_opcionais:
+        celular = None
+        cpf = None
+        data_admissao = None
+    else:
+        celular = funcionario.celular
+        cpf = funcionario.cpf
+        data_admissao = funcionario.data_admissao
+
     novo_funcionario = FuncionarioModel(
         nome=funcionario.nome,
         sobrenome=funcionario.sobrenome,
-        celular=funcionario.celular,
+        celular=celular,
         email=funcionario.email,
-        cpf=funcionario.cpf,
+        cpf=cpf,
         data_afastamento=converter_string_para_date(funcionario.data_afastamento),
         tipo_contrato=funcionario.tipo_contrato,
         data_retorno=converter_string_para_date(funcionario.data_retorno),
@@ -212,7 +226,14 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
         db_funcionario.id_eyal = funcionario.id_eyal
     if funcionario.tipo_contrato is not None and funcionario.tipo_contrato != '':
         db_funcionario.tipo_contrato = funcionario.tipo_contrato
-    
+
+        # Se o tipo de contrato for Genérico ou Terceirizado, remove campos opcionais
+        campos_opcionais = ['genérico', 'generico', 'terceirizado']
+        if funcionario.tipo_contrato.lower() in campos_opcionais:
+            db_funcionario.celular = None
+            db_funcionario.cpf = None
+            db_funcionario.data_admissao = None
+
     # Atualiza vínculo de cargo - prioriza campos separados se fornecidos
     cargo_obj = None
     

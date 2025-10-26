@@ -100,6 +100,7 @@ class ComissaoResumo(BaseModel):
     projecao_meta: float
     campanhas: float
     quantidade_vendas: int
+    pagamento_producao: float = 0.0  # Valor do pagamento de meta (da tabela pagamentos_meta)
 
 
 class ComissaoErroResponse(BaseModel):

@@ -114,82 +114,82 @@
           <div v-if="loadingStates.grupos" class="loading-overlay">
             <div class="mini-spinner"></div>
           </div>
-          <table style="min-width:1200px;">
+          <table class="responsive-table">
       <thead>
         <tr>
-          <th @click="toggleOrdenacaoNome" style="cursor:pointer">
+          <th class="col-nome" @click="toggleOrdenacaoNome" style="cursor:pointer">
             Nome
             <span v-if="ordenacaoNome === 'asc'">▲</span>
             <span v-else>▼</span>
           </th>
-          <th>Sobrenome</th>
-          <th>Data de Admissão</th>
-          <th>Data de Desligamento</th>
-          <th>Celular</th>
-          <th>E-mail</th>
-          <th>Grupo E-mail</th>
-          <th>Grupo WhatsApp</th>
-          <th>Pastas</th>
-          <th>Setor</th>
-          <th>Cargo</th>
-          <th>Sistemas</th>
-          <th>Ações</th>
+          <th class="col-sobrenome">Sobrenome</th>
+          <th class="col-data-admissao">Data de Admissão</th>
+          <th class="col-data-desligamento">Data de Desligamento</th>
+          <th class="col-celular">Celular</th>
+          <th class="col-email">E-mail</th>
+          <th class="col-grupo-email">Grupo E-mail</th>
+          <th class="col-grupo-whatsapp">Grupo WhatsApp</th>
+          <th class="col-pastas">Pastas</th>
+          <th class="col-setor">Setor</th>
+          <th class="col-cargo">Cargo</th>
+          <th class="col-sistemas">Sistemas</th>
+          <th class="col-acoes">Ações</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="func in funcionariosFiltrados" :key="func.id">
-          <td :class="['clicavel', celulasExpandidas.has('nome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('nome-' + func.id)">
+          <td class="col-nome" :class="['clicavel', celulasExpandidas.has('nome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('nome-' + func.id)">
             {{ func.nome }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('sobrenome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sobrenome-' + func.id)">
+          <td class="col-sobrenome" :class="['clicavel', celulasExpandidas.has('sobrenome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sobrenome-' + func.id)">
             {{ func.sobrenome }}
           </td>
-          <td>
+          <td class="col-data-admissao">
             {{ func.data_admissao ? func.data_admissao.split('-').reverse().join('/') : '—' }}
           </td>
-          <td>
+          <td class="col-data-desligamento">
             {{ func.data_inativado ? func.data_inativado.split('-').reverse().join('/') : '—' }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('celular-' + func.id) ? 'expandida' : '']" @click="toggleCelula('celular-' + func.id)">
+          <td class="col-celular" :class="['clicavel', celulasExpandidas.has('celular-' + func.id) ? 'expandida' : '']" @click="toggleCelula('celular-' + func.id)">
             {{ func.celular }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('email-' + func.id) ? 'expandida' : '']" @click="toggleCelula('email-' + func.id)">
+          <td class="col-email" :class="['clicavel', celulasExpandidas.has('email-' + func.id) ? 'expandida' : '']" @click="toggleCelula('email-' + func.id)">
             {{ func.email }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('grupos-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-' + func.id)">
+          <td class="col-grupo-email" :class="['clicavel', celulasExpandidas.has('grupos-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-' + func.id)">
             <span v-if="func.grupos_email && func.grupos_email.length">
               {{ func.grupos_email.map(g => g.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('grupos-whatsapp-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-whatsapp-' + func.id)">
+          <td class="col-grupo-whatsapp" :class="['clicavel', celulasExpandidas.has('grupos-whatsapp-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-whatsapp-' + func.id)">
             <span v-if="func.grupos_whatsapp && func.grupos_whatsapp.length">
               {{ func.grupos_whatsapp.map(g => g.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('grupos-pasta-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-pasta-' + func.id)">
+          <td class="col-pastas" :class="['clicavel', celulasExpandidas.has('grupos-pasta-' + func.id) ? 'expandida' : '']" @click="toggleCelula('grupos-pasta-' + func.id)">
             <span v-if="func.grupos_pasta && func.grupos_pasta.length">
               {{ func.grupos_pasta.map(g => g.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('setores-' + func.id) ? 'expandida' : '']" @click="toggleCelula('setores-' + func.id)">
+          <td class="col-setor" :class="['clicavel', celulasExpandidas.has('setores-' + func.id) ? 'expandida' : '']" @click="toggleCelula('setores-' + func.id)">
             <span v-if="func.setores && func.setores.length">
               {{ func.setores.map(s => s.nome).join(', ') }}
             </span>
             <span v-else>—</span>
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('cargo-' + func.id) ? 'expandida' : '']" @click="toggleCelula('cargo-' + func.id)">
+          <td class="col-cargo" :class="['clicavel', celulasExpandidas.has('cargo-' + func.id) ? 'expandida' : '']" @click="toggleCelula('cargo-' + func.id)">
             {{ func.cargo && typeof func.cargo === 'object' && func.cargo.nome ? func.cargo.nome : (func.cargo || '—') }}
           </td>
-          <td :class="['clicavel', celulasExpandidas.has('sistemas-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sistemas-' + func.id)">
+          <td class="col-sistemas" :class="['clicavel', celulasExpandidas.has('sistemas-' + func.id) ? 'expandida' : '']" @click="toggleCelula('sistemas-' + func.id)">
             <span v-if="func.sistemas && func.sistemas.length">
               {{ func.sistemas.map(s => `${s.nome} (${s.status})`).join(', ') }}
             </span>
             <span v-else>Nenhum sistema vinculado</span>
           </td>
-          <td>
+          <td class="col-acoes">
             <div class="action-buttons-table">
               <button v-if="$auth && ($auth.hasPermission('editar_colaborador') || $auth.hasPermission('adm'))" class="btn-editar" @click="abrirEditar(func)">
                 <i class="fas fa-edit"></i>
@@ -303,15 +303,15 @@
               <label>Sobrenome</label>
               <input v-model="form.sobrenome" placeholder="Sobrenome" required />
             </div>
-            <div>
+            <div v-if="!contratoEspecial">
               <label>Celular</label>
               <input v-model="form.celular" placeholder="Celular" />
             </div>
-            <div>
+            <div v-if="!contratoEspecial">
               <label>CPF</label>
-              <input v-model="form.cpf" placeholder="CPF" />
+              <input v-model="form.cpf" placeholder="CPF" :required="contratoObrigatorio" />
             </div>
-            <div>
+            <div v-if="!contratoEspecial">
               <label>ID Eyal</label>
               <input v-model="form.id_eyal" placeholder="ID Eyal" />
             </div>
@@ -321,7 +321,13 @@
             </div>
             <div>
               <label>Tipo de Contrato</label>
-              <input v-model="form.tipo_contrato" placeholder="Tipo de Contrato" />
+              <select v-model="form.tipo_contrato">
+                <option value="">Selecione...</option>
+                <option value="CLT">CLT</option>
+                <option value="PJ">PJ</option>
+                <option value="Genérico">Genérico</option>
+                <option value="Terceirizado">Terceirizado</option>
+              </select>
             </div>
             <div style="grid-column: span 2;">
               <label>E-mail</label>
@@ -625,9 +631,17 @@ export default {
     
     sistemasDisponiveis() {
       if (!this.sistemas.length) return [];
-      return this.sistemas.filter(sistema => 
+      return this.sistemas.filter(sistema =>
         !this.form.sistemas_ids.includes(sistema.id)
       );
+    },
+    contratoEspecial() {
+      const tipo = (this.form.tipo_contrato || '').toLowerCase();
+      return tipo === 'genérico' || tipo === 'generico' || tipo === 'terceirizado';
+    },
+    contratoObrigatorio() {
+      const tipo = (this.form.tipo_contrato || '').toLowerCase();
+      return tipo === 'clt' || tipo === 'pj';
     }
   },
   methods: {
@@ -2042,7 +2056,8 @@ tbody tr:last-child td {
   text-align: center;
 }
 
-.form-modal input {
+.form-modal input,
+.form-modal select {
   width: 100%;
   padding: 10px;
   margin-bottom: 16px;
@@ -2050,9 +2065,11 @@ tbody tr:last-child td {
   border-radius: 4px;
   font-size: 15px;
   font-family: var(--font-corpo);
+  background: white;
 }
 
-.form-modal input:focus {
+.form-modal input:focus,
+.form-modal select:focus {
   outline: 2px solid var(--cor-destaque);
 }
 

@@ -6,6 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.dependencies import get_db
+from app.config import settings
 from app.models.vendas import BaseCampanhas
 from app.models.metas_colaboradores import MetaColaborador
 from app.schemas.vendas import VendasResponse, ResumoVendas, DetalheVenda, VendasPorGrupo
@@ -14,6 +15,21 @@ router = APIRouter(
     prefix="/vendas",
     tags=["Vendas"]
 )
+
+
+def verificar_cargo_em_lista(cargo: str, lista_cargos: list) -> bool:
+    """
+    Verifica se o cargo do colaborador está na lista configurada.
+    Faz busca case-insensitive e parcial.
+    """
+    if not cargo:
+        return False
+
+    cargo_lower = cargo.lower()
+    for cargo_config in lista_cargos:
+        if cargo_config.lower() in cargo_lower:
+            return True
+    return False
 
 
 def classificar_grupo(grupo_exames: str, abrev_exame: str) -> str:
@@ -47,11 +63,14 @@ async def get_vendas_colaborador(
 ):
     """
     Retorna todas as vendas de um colaborador específico.
-    
+
     REGRA DE LIDERANÇA:
-    - Se o colaborador for LÍDER (supervisor, monitor, orientador, etc), 
+    - Se o colaborador for LÍDER (supervisor, monitor, orientador, etc),
       retorna a soma das vendas dele + vendas da sua equipe.
     """
+    print("=" * 80)
+    print(f"🔥🔥🔥 ENDPOINT /vendas/colaborador/{cod_usuario} CHAMADO - CÓDIGO NOVO! 🔥🔥🔥")
+    print("=" * 80)
     try:
         if mes_ref:
             try:
@@ -62,36 +81,72 @@ async def get_vendas_colaborador(
             hoje = date.today()
             mes_referencia = date(hoje.year, hoje.month, 1)
         
-        # ✅ NOVO: Verificar se o colaborador é LÍDER consultando a tabela de metas
+        # ⭐ ATUALIZADO: Usar configuração de cargos do config.py
         mes_ref_str = mes_referencia.strftime("%Y-%m-01")  # Formato YYYY-MM-DD
-        
+
+        print(f"\n[VENDAS DEBUG] Buscando meta_colaborador:")
+        print(f"[VENDAS DEBUG]    id_eyal: {cod_usuario}")
+        print(f"[VENDAS DEBUG]    mes_ref procurado: {mes_ref_str}")
+
+        # DEBUG: Verificar se existe registro desse id_eyal em qualquer mês
+        metas_existentes = db.query(MetaColaborador).filter(
+            MetaColaborador.id_eyal == cod_usuario
+        ).all()
+
+        if metas_existentes:
+            print(f"[VENDAS DEBUG] ✅ Encontrados {len(metas_existentes)} registros para id_eyal={cod_usuario}")
+            print(f"[VENDAS DEBUG]    Meses disponíveis:")
+            for m in metas_existentes[:3]:  # Mostrar apenas os 3 primeiros
+                print(f"[VENDAS DEBUG]      - mes_ref='{m.mes_ref}' | cargo={m.cargo} | unidade={m.unidade}")
+        else:
+            print(f"[VENDAS DEBUG] ❌ NENHUM registro encontrado para id_eyal={cod_usuario} em nenhum mês!")
+
         meta_colaborador = db.query(MetaColaborador).filter(
             MetaColaborador.id_eyal == cod_usuario,
             MetaColaborador.mes_ref == mes_ref_str
         ).first()
-        
-        # Lista de cargos de liderança (mesma lógica do endpoint de realizado)
-        cargos_lideranca = [
-            "supervisor de atendimento",
-            "monitor",
-            "orientador",
-            "coordenador",
-            "gerente"
-        ]
-        
-        eh_lider = False
-        nome_lider = None
-        
-        if meta_colaborador:
-            cargo_lower = (meta_colaborador.cargo or "").lower()
-            eh_lider = any(cargo in cargo_lower for cargo in cargos_lideranca)
-            nome_lider = meta_colaborador.nome
-         
-        # Se for líder, buscar vendas dele + equipe
-        if eh_lider and nome_lider:
-            return await _get_vendas_com_liderados(cod_usuario, nome_lider, mes_referencia, mes_ref_str, db)
-        
-        # Se não for líder, retorna apenas as vendas dele (lógica original)
+
+        if not meta_colaborador:
+            # Se não tem meta cadastrada, retorna vendas próprias
+            print(f"[VENDAS DEBUG] ⚠️ META NÃO ENCONTRADA para {cod_usuario} no mês {mes_ref_str}")
+            print(f"[VENDAS DEBUG]    Caindo para lógica de VENDAS PRÓPRIAS")
+            pass
+        else:
+            cargo = meta_colaborador.cargo or ""
+            unidade = meta_colaborador.unidade or ""
+
+            # Verificar tipo de cargo usando configuração
+            eh_cargo_filial_completa = verificar_cargo_em_lista(cargo, settings.CARGOS_FILIAL_COMPLETA)
+            eh_cargo_hierarquia = verificar_cargo_em_lista(cargo, settings.CARGOS_HIERARQUIA)
+
+            # ⭐ REGRA ESPECIAL: CENTRAL DE MARCAÇÕES
+            unidade_upper = unidade.upper()
+            eh_central_marcacoes = 'CENTRAL' in unidade_upper and ('MARCAÇÕES' in unidade_upper or 'MARCACOES' in unidade_upper)
+            eh_gerente = verificar_cargo_em_lista(cargo, ["GERENTE"])
+
+            # Aplicar filial completa APENAS se:
+            # 1. É GERENTE (sempre vê toda filial) OU
+            # 2. É cargo de filial completa E NÃO é CENTRAL DE MARCAÇÕES (fora da Central vê filial inteira)
+            aplicar_filial_completa = eh_gerente or (eh_cargo_filial_completa and not eh_central_marcacoes)
+
+            print(f"\n[VENDAS] Análise de escopo para {cod_usuario}:")
+            print(f"[VENDAS]    Cargo: {cargo}")
+            print(f"[VENDAS]    Unidade: {unidade}")
+            print(f"[VENDAS]    É CENTRAL: {eh_central_marcacoes}")
+            print(f"[VENDAS]    ⭐ Aplicar FILIAL COMPLETA: {aplicar_filial_completa}")
+
+            # Se aplicar filial completa, buscar TODAS vendas da filial
+            if aplicar_filial_completa:
+                print(f"[VENDAS] 🏢 FILIAL COMPLETA: Buscando TODAS vendas da filial '{unidade}'")
+                return await _get_vendas_filial_completa(cod_usuario, meta_colaborador.nome, unidade, mes_referencia, db)
+
+            # Se for cargo de hierarquia OU cargo filial fora da Central, buscar vendas da equipe
+            elif eh_cargo_hierarquia or eh_cargo_filial_completa:
+                print(f"[VENDAS] 👥 HIERARQUIA: Buscando vendas da equipe")
+                return await _get_vendas_com_liderados(cod_usuario, meta_colaborador.nome, mes_referencia, mes_ref_str, db)
+
+        # Default: retorna apenas as vendas dele (lógica original)
+        print(f"[VENDAS] 👤 VENDAS PRÓPRIAS: Apenas vendas do colaborador {cod_usuario}")
         
         vendas = db.query(BaseCampanhas).filter(
             and_(
@@ -278,20 +333,162 @@ async def get_vendas_por_grupo(
         raise HTTPException(status_code=500, detail=f"Erro ao buscar vendas do grupo: {str(e)}")
 
 
+async def _get_vendas_filial_completa(
+    cod_usuario: str,
+    nome_usuario: str,
+    unidade: str,
+    mes_referencia: date,
+    db: Session
+) -> VendasResponse:
+    """
+    Retorna TODAS as vendas da FILIAL (não apenas IDs específicos).
+
+    Usado para:
+    - GERENTES (sempre)
+    - COORDENADORES/MONITORES da CENTRAL DE MARCAÇÕES
+
+    Args:
+        cod_usuario: ID do colaborador
+        nome_usuario: Nome do colaborador
+        unidade: Nome da filial/unidade
+        mes_referencia: Data de referência do mês
+        db: Sessão do banco de dados
+    """
+    print(f"--- [VENDAS] 🏢 FILIAL COMPLETA: Buscando TODAS vendas da filial '{unidade}' ---")
+
+    # 1. Buscar todos colaboradores da unidade no mês
+    colaboradores_unidade = db.query(MetaColaborador).filter(
+        MetaColaborador.unidade == unidade,
+        MetaColaborador.mes_ref == mes_referencia.strftime('%Y-%m-01')
+    ).all()
+
+    # 2. Extrair IDs
+    ids_colaboradores = [c.id_eyal for c in colaboradores_unidade if c.id_eyal]
+    print(f"    📋 Encontrados {len(ids_colaboradores)} colaboradores na unidade '{unidade}'")
+
+    if not ids_colaboradores:
+        print(f"    ⚠️ Nenhum colaborador encontrado na unidade!")
+        vendas = []
+    else:
+        # 3. Buscar TODAS as vendas desses colaboradores no mês
+        vendas = db.query(BaseCampanhas).filter(
+            and_(
+                BaseCampanhas.cod_usuario.in_(ids_colaboradores),
+                extract('year', BaseCampanhas.mes) == mes_referencia.year,
+                extract('month', BaseCampanhas.mes) == mes_referencia.month
+            )
+        ).all()
+
+    print(f"    ✅ Total de vendas da filial: {len(vendas)}")
+
+    if vendas:
+        ids_unicos_vendedores = set([v.cod_usuario for v in vendas])
+        print(f"    ℹ️ {len(ids_unicos_vendedores)} vendedores únicos")
+
+    if not vendas:
+        return VendasResponse(
+            success=True,
+            resumo=None,
+            detalhes=[],
+            message=f"Nenhuma venda encontrada para a filial {unidade}"
+        )
+
+    # Processar vendas
+    contadores = {
+        'odonto': 0,
+        'check_up': 0,
+        'baby_click': 0,
+        'dr_central': 0,
+        'orcamentos': 0
+    }
+
+    vendas_por_grupo_dict = {}
+    detalhes_list = []
+    valor_total = 0.0
+
+    for venda in vendas:
+        categoria = classificar_grupo(venda.grupo_exames or "", venda.abrev_exame or "")
+
+        if categoria == 'ODONTO':
+            contadores['odonto'] += 1
+        elif categoria == 'CHECK UP':
+            contadores['check_up'] += 1
+        elif categoria == 'BabyClick':
+            contadores['baby_click'] += 1
+        elif categoria == 'DR CENTRAL':
+            contadores['dr_central'] += 1
+        else:
+            contadores['orcamentos'] += 1
+
+        if categoria not in vendas_por_grupo_dict:
+            vendas_por_grupo_dict[categoria] = {
+                'quantidade': 0,
+                'valor_total': 0.0
+            }
+
+        valor = float(venda.valor_original_proc) if venda.valor_original_proc else 0.0
+        vendas_por_grupo_dict[categoria]['quantidade'] += 1
+        vendas_por_grupo_dict[categoria]['valor_total'] += valor
+        valor_total += valor
+
+        detalhes_list.append(DetalheVenda(
+            mes=venda.mes,
+            data_agenda=venda.data_agenda,
+            cod_paciente=venda.cod_paciente,
+            nome_exame=venda.nome_exame_ajustado or "",
+            grupo_exames=venda.grupo_exames or "",
+            valor=valor,
+            unidade=venda.unidade or "",
+            abrev_exame=venda.abrev_exame or ""
+        ))
+
+    vendas_por_grupo_list = [
+        VendasPorGrupo(
+            grupo=grupo,
+            quantidade=dados['quantidade'],
+            valor_total=dados['valor_total']
+        )
+        for grupo, dados in vendas_por_grupo_dict.items()
+    ]
+
+    resumo = ResumoVendas(
+        cod_usuario=cod_usuario,
+        nome_usuario=f"{nome_usuario} (FILIAL COMPLETA)",
+        mes_referencia=mes_referencia,
+        total_vendas=len(vendas),
+        valor_total=valor_total,
+        odonto=contadores['odonto'],
+        check_up=contadores['check_up'],
+        baby_click=contadores['baby_click'],
+        dr_central=contadores['dr_central'],
+        orcamentos=contadores['orcamentos'],
+        vendas_por_grupo=vendas_por_grupo_list
+    )
+
+    print(f"--- [VENDAS] Total de vendas (FILIAL COMPLETA): {len(vendas)} | Valor total: R$ {valor_total:.2f} ---")
+
+    return VendasResponse(
+        success=True,
+        resumo=resumo,
+        detalhes=detalhes_list,
+        message=f"Vendas incluem TODA a filial {unidade}"
+    )
+
+
 async def _get_vendas_com_liderados(
-    cod_usuario_lider: str, 
-    nome_lider: str, 
+    cod_usuario_lider: str,
+    nome_lider: str,
     mes_referencia: date,
     mes_ref_str: str,
     db: Session
 ) -> VendasResponse:
     """
     Retorna vendas do LÍDER + vendas da EQUIPE (liderados).
-    
+
     REGRA ESPECIAL PARA COORDENADORES/GERENTES:
     - Busca TODAS as vendas da FILIAL (não apenas dos IDs cadastrados)
     - Inclui: equipe ativa + desligados + colaboradores sem meta cadastrada
-    
+
     Args:
         cod_usuario_lider: ID do colaborador líder
         nome_lider: Nome do líder direto

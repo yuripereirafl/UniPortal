@@ -40,6 +40,9 @@ from app.routes.vendas import router as vendas_router
 from app.routes.nps import router as nps_router  # ✅ NOVO: NPS/CSAT
 from app.routes.orcamentos import router as orcamentos_router  # ✅ NOVO: Orçamentos
 from app.routes.comissao import router as comissao_router  # ✅ NOVO: Comissões
+from app.routes.colaborador_resumo import router as colaborador_resumo_router  # ✅ Novo: resumo rápido colaborador
+from app.routes.unidade_resumo import router as unidade_resumo_router  # ✅ NOVO: Resumo rápido unidade
+from app.routes.pagamentos import router as pagamentos_router  # ✅ NOVO: Pagamentos de Meta
 
 # --- INICIALIZAÇÃO DA APLICAÇÃO ---
 app = FastAPI(
@@ -51,7 +54,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # Permitir origin específica do frontend na VM e manter regex para outros ambientes locais
-    allow_origins=["http://192.168.1.202:8080", "http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=["http://192.168.0.103:8080", "http://localhost:8080", "http://127.0.0.1:8080"],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
@@ -85,6 +88,9 @@ app.include_router(vendas_router)  # ✅ Vendas da basecampanhas
 app.include_router(nps_router)  # ✅ NOVO: NPS/CSAT
 app.include_router(orcamentos_router)  # ✅ NOVO: Orçamentos
 app.include_router(comissao_router)  # ✅ NOVO: Comissões
+app.include_router(colaborador_resumo_router)  # ✅ Registrar rota: /realizado/colaborador/resumo-rapido
+app.include_router(unidade_resumo_router)  # ✅ NOVO: Resumo rápido unidade - /realizado/unidade/resumo-rapido
+app.include_router(pagamentos_router)  # ✅ NOVO: Pagamentos de Meta
 
 # --- OS SEUS ENDPOINTS DE DASHBOARD (MANTIDOS INTACTOS) ---
 @app.get("/dashboard/totais")
