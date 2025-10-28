@@ -10,7 +10,11 @@ from app.models.metas_colaboradores import MetaColaborador # Modelo SQLAlchemy
 from app.models.resultado_csat import ResultadoCSAT # Modelo SQLAlchemy
 # <<< VERIFIQUE SE O NOME DO MODELO ESTÁ CORRETO >>>
 from app.models.nps_unidades import NpsUnidades # Modelo SQLAlchemy para rh_homologacao.nps_unidades
-from sqlalchemy import func
+from app.models.vendas import BaseCampanhas
+from app.models.resultados_campanha import ResultadoCampanha
+from app.models.pagamentos_meta import PagamentoMeta
+from sqlalchemy import func, extract
+from app.config import settings
 
 router = APIRouter(
     prefix="/realizado/colaborador",
@@ -300,3 +304,332 @@ def get_resumo_rapido_colaborador(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao obter resumo rápido: {str(e)}")
+
+
+def classificar_grupo(grupo_exames: str, abrev_exame: str) -> str:
+    """Classifica a venda em uma categoria específica"""
+    if not grupo_exames:
+        grupo_exames = ""
+    if not abrev_exame:
+        abrev_exame = ""
+
+    grupo_upper = grupo_exames.strip().upper()
+    abrev_upper = abrev_exame.strip().upper()
+
+    # Usar 'in' para pegar variações como "157 - ODONTO", "ODONTO", etc
+    if 'ODONTO' in grupo_upper:
+        return 'ODONTO'
+    elif 'CHECK UP' in grupo_upper or 'CHECKUP' in grupo_upper:
+        return 'CHECK UP'
+    elif 'BABYCLICK' in grupo_upper or 'BABY CLICK' in grupo_upper:
+        return 'BabyClick'
+    elif 'DR CENTRAL' in abrev_upper or 'DR CENTRAL' in grupo_upper:
+        return 'DR CENTRAL'
+    else:
+        return 'MARCUZ'  # Exames/Marcuz
+
+
+def obter_ordem_hierarquia(cargo: str) -> int:
+    """
+    Retorna um número representando a ordem hierárquica do cargo.
+    Menor número = maior hierarquia
+    """
+    cargo_upper = cargo.upper() if cargo else ""
+
+    # Verificar em cada lista de cargos
+    if any(c in cargo_upper for c in ["GERENTE"]):
+        return 1
+    elif any(c in cargo_upper for c in ["COORDENADOR"]):
+        return 2
+    elif any(c in cargo_upper for c in ["MONITOR"]):
+        return 3
+    elif any(c in cargo_upper for c in ["SUPERVISOR"]):
+        return 4
+    elif any(c in cargo_upper for c in ["ATENDENTE"]):
+        return 5
+    elif any(c in cargo_upper for c in ["ESTAGIÁRIO", "ESTAGIARIA"]):
+        return 6
+    else:
+        return 99  # Cargos não reconhecidos vão pro final
+
+
+@router.get("/lista-unidade")
+def listar_colaboradores_unidade(
+    unidade: Optional[str] = None,
+    mes_ref: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    📋 Retorna lista detalhada de TODOS os colaboradores de uma unidade
+    com métricas individuais, ordenados por hierarquia de cargo.
+
+    Retorna:
+    - Nome, cargo, unidade
+    - Meta total, realizado, saldo
+    - Projeção de atingimento
+    - NPS agregado
+    - Vendas detalhadas (ODONTO, MARCUZ, CHECK-UP, DN CENTRAL, DIAGNÓSTICOS)
+    - Comissão (Valor Pago Produção, Campanhas)
+
+    Args:
+        unidade: Nome da unidade (ex: "PELOTAS"). Se não fornecido, retorna todos
+        mes_ref: Mês de referência (formato YYYY-MM-DD ou YYYY-MM)
+    """
+    try:
+        # 1) Determinar mes_ref
+        mes_ref_dt = None
+        if mes_ref:
+            try:
+                mes_ref_dt = datetime.strptime(str(mes_ref)[:10], "%Y-%m-%d").date()
+            except:
+                try:
+                    mes_ref_dt = datetime.strptime(f"{mes_ref}-01", "%Y-%m-%d").date()
+                except:
+                    pass
+
+        if not mes_ref_dt:
+            hoje = datetime.now().date()
+            mes_ref_dt = hoje.replace(day=1)
+            mes_ref = mes_ref_dt.isoformat()
+
+        print(f"\n{'='*80}")
+        print(f"📋 LISTANDO COLABORADORES DA UNIDADE")
+        print(f"📍 Unidade: {unidade or 'TODAS'} | Mês: {mes_ref_dt}")
+        print(f"{'='*80}\n")
+
+        # 2) Buscar todos colaboradores da unidade
+        query = db.query(MetaColaborador).filter(MetaColaborador.mes_ref == mes_ref_dt)
+
+        if unidade:
+            query = query.filter(MetaColaborador.unidade.ilike(f"%{unidade}%"))
+
+        colaboradores = query.all()
+
+        if not colaboradores:
+            return {
+                "unidade": unidade,
+                "mes_ref": mes_ref,
+                "total_colaboradores": 0,
+                "colaboradores": []
+            }
+
+        print(f"👥 Total de colaboradores encontrados: {len(colaboradores)}\n")
+
+        # 3) Calcular dias trabalhados do mês (para projeção)
+        hoje = datetime.now().date()
+        dias_trabalhados_ate_ontem = 0
+        dias_totais_mes = 0
+
+        if hoje.year == mes_ref_dt.year and hoje.month == mes_ref_dt.month:
+            ontem = hoje - timedelta(days=1)
+            primeiro_dia_mes = hoje.replace(day=1)
+            _, ultimo_dia_num = calendar.monthrange(hoje.year, hoje.month)
+            ultimo_dia_mes = hoje.replace(day=ultimo_dia_num)
+            dias_trabalhados_ate_ontem = calcular_dias_trabalhados(primeiro_dia_mes, ontem)
+            dias_totais_mes = calcular_dias_trabalhados(primeiro_dia_mes, ultimo_dia_mes)
+
+        # 4) Processar cada colaborador
+        lista_colaboradores = []
+
+        for colab in colaboradores:
+            try:
+                id_eyal = colab.id_eyal
+                nome = colab.nome or "N/A"
+                cargo = colab.cargo or ""
+                unidade_colab = colab.unidade or ""
+
+                print(f"  📊 Processando: {nome} ({cargo})")
+
+                # 4.1) Meta e realizado
+                meta_total = float(colab.meta_final or 0)
+                meta_diaria = float(colab.meta_diaria or 0)
+
+                # Buscar realizado (última carga)
+                latest_carga = db.query(func.max(PainelResultadosDiarios.data_carga)).filter(
+                    PainelResultadosDiarios.id_eyal == id_eyal,
+                    PainelResultadosDiarios.mes_ref == mes_ref_dt
+                ).scalar()
+
+                realizado = 0.0
+                if latest_carga:
+                    painel = db.query(PainelResultadosDiarios).filter(
+                        PainelResultadosDiarios.id_eyal == id_eyal,
+                        PainelResultadosDiarios.mes_ref == mes_ref_dt,
+                        PainelResultadosDiarios.data_carga == latest_carga
+                    ).first()
+
+                    if painel:
+                        realizado = float(painel.realizado_final or 0)
+
+                # 4.2) Calcular projeção
+                saldo = realizado - meta_total
+                percentual_atual = (realizado / meta_total * 100) if meta_total > 0 else 0.0
+
+                producao_dia_media = 0.0
+                previsao_atingimento = 0.0
+                percentual_projetado = 0.0
+
+                if dias_trabalhados_ate_ontem > 0 and meta_total > 0:
+                    producao_dia_media = realizado / dias_trabalhados_ate_ontem
+                    previsao_atingimento = producao_dia_media * dias_totais_mes
+                    percentual_projetado = (previsao_atingimento / meta_total * 100)
+                elif meta_total > 0:
+                    previsao_atingimento = realizado
+                    percentual_projetado = percentual_atual
+
+                # 4.3) Buscar NPS agregado
+                nps_agregado = 0.0
+                try:
+                    cod_usuario_int = int(id_eyal)
+
+                    # ResultadoCSAT
+                    resultado_csat = db.query(ResultadoCSAT).filter(
+                        ResultadoCSAT.cod_usuario == cod_usuario_int,
+                        extract('year', ResultadoCSAT.mes) == mes_ref_dt.year,
+                        extract('month', ResultadoCSAT.mes) == mes_ref_dt.month
+                    ).first()
+
+                    # NpsUnidades
+                    registros_unidades = db.query(NpsUnidades).filter(
+                        NpsUnidades.cod_usuario == cod_usuario_int,
+                        NpsUnidades.mes_ref == mes_ref_dt
+                    ).all()
+
+                    # Agregar
+                    qtd_detrator_total = (resultado_csat.qtd_detrator or 0) if resultado_csat else 0
+                    qtd_detrator_total += sum(r.total_detratores or 0 for r in registros_unidades)
+
+                    qtd_promotor_total = (resultado_csat.qtd_promotor or 0) if resultado_csat else 0
+                    qtd_promotor_total += sum(r.total_promotores or 0 for r in registros_unidades)
+
+                    qtd_total = (resultado_csat.qtd_tt or 0) if resultado_csat else 0
+                    qtd_total += sum(r.total_respondentes or 0 for r in registros_unidades)
+
+                    if qtd_total > 0:
+                        nps_agregado = ((qtd_promotor_total - qtd_detrator_total) / qtd_total) * 100
+                except:
+                    pass
+
+                # 4.4) Buscar vendas detalhadas
+                vendas = {
+                    "odonto": 0,
+                    "marcuz": 0,
+                    "checkup": 0,
+                    "dn_central": 0,
+                    "diagnosticos": 0,
+                    "total": 0
+                }
+
+                try:
+                    vendas_registros = db.query(BaseCampanhas).filter(
+                        BaseCampanhas.cod_usuario == id_eyal,
+                        extract('year', BaseCampanhas.mes) == mes_ref_dt.year,
+                        extract('month', BaseCampanhas.mes) == mes_ref_dt.month
+                    ).all()
+
+                    for venda in vendas_registros:
+                        # Classificar usando grupo_exames e abrev_exame
+                        categoria = classificar_grupo(
+                            venda.grupo_exames or "",
+                            venda.abrev_exame or ""
+                        )
+
+                        # Cada registro é uma venda (quantidade = 1)
+                        if categoria == 'ODONTO':
+                            vendas["odonto"] += 1
+                        elif categoria == 'MARCUZ':
+                            vendas["marcuz"] += 1
+                        elif categoria == 'CHECK UP':
+                            vendas["checkup"] += 1
+                        elif categoria == 'DR CENTRAL':
+                            vendas["dn_central"] += 1
+                        # BabyClick vai para diagnósticos
+                        elif categoria == 'BabyClick':
+                            vendas["diagnosticos"] += 1
+
+                    vendas["total"] = vendas["odonto"] + vendas["marcuz"] + vendas["checkup"] + vendas["dn_central"] + vendas["diagnosticos"]
+                except:
+                    pass
+
+                # 4.5) Buscar comissão
+                comissao = {
+                    "valor_pago_producao": 0.0,
+                    "campanhas": 0.0,
+                    "total": 0.0
+                }
+
+                try:
+                    # Valor Pago Produção (pagamentos_meta)
+                    pagamento = db.query(PagamentoMeta).filter(
+                        PagamentoMeta.id_eyal == id_eyal,
+                        PagamentoMeta.mes_ref == mes_ref_dt
+                    ).first()
+
+                    if pagamento:
+                        comissao["valor_pago_producao"] = float(pagamento.valor_a_pagar or 0)
+
+                    # Campanhas (resultados_campanha)
+                    resultado_campanha = db.query(ResultadoCampanha).filter(
+                        ResultadoCampanha.id_eyal == id_eyal,
+                        ResultadoCampanha.mes_ref == mes_ref_dt
+                    ).first()
+
+                    if resultado_campanha:
+                        comissao["campanhas"] = float(resultado_campanha.valor_a_pagar or 0)
+
+                    comissao["total"] = comissao["valor_pago_producao"] + comissao["campanhas"]
+                except:
+                    pass
+
+                # 4.6) Montar objeto do colaborador
+                colaborador_obj = {
+                    "id_eyal": id_eyal,
+                    "nome": nome,
+                    "cargo": cargo,
+                    "unidade": unidade_colab,
+                    "ordem_hierarquia": obter_ordem_hierarquia(cargo),  # Para ordenação
+                    "meta_total": round(meta_total, 2),
+                    "meta_diaria": round(meta_diaria, 2),
+                    "realizado": round(realizado, 2),
+                    "saldo": round(saldo, 2),
+                    "percentual_atual": round(percentual_atual, 2),
+                    "producao_dia_media": round(producao_dia_media, 2),
+                    "previsao_atingimento": round(previsao_atingimento, 2),
+                    "percentual_projetado": round(percentual_projetado, 2),
+                    "nps": round(nps_agregado, 2),
+                    "vendas": vendas,
+                    "comissao": comissao
+                }
+
+                lista_colaboradores.append(colaborador_obj)
+
+            except Exception as e:
+                print(f"  ⚠️ Erro ao processar {colab.nome}: {e}")
+                traceback.print_exc()
+                continue
+
+        # 5) Ordenar por hierarquia (ordem crescente = maior hierarquia primeiro)
+        lista_colaboradores.sort(key=lambda x: (x["ordem_hierarquia"], x["nome"]))
+
+        # Remover campo de ordenação antes de retornar
+        for colab in lista_colaboradores:
+            del colab["ordem_hierarquia"]
+
+        print(f"\n✅ Processamento concluído: {len(lista_colaboradores)} colaboradores\n")
+        print(f"{'='*80}\n")
+
+        return {
+            "unidade": unidade,
+            "mes_ref": mes_ref,
+            "total_colaboradores": len(lista_colaboradores),
+            "colaboradores": lista_colaboradores
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao listar colaboradores da unidade: {str(e)}"
+        )

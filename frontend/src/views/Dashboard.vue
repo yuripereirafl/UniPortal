@@ -7,7 +7,7 @@
           <img src="@/assets/logo.png" alt="Logo" class="logo-img" />
         </div>
         <button class="hamburger-btn" @click="toggleSidebar">
-          <i class="fas fa-arrow-left"></i>
+          <i :class="['fas', isCollapsed ? 'fa-arrow-right' : 'fa-arrow-left']"></i>
         </button>
       </div>
 

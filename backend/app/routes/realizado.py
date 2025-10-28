@@ -311,6 +311,234 @@ def get_historico_realizado(
         )
 
 # ========================================
+# ENDPOINT ESPECÍFICO - LISTA UNIDADE
+# (Deve vir ANTES dos endpoints com path parameters)
+# ========================================
+
+@router.get("/colaborador/lista-unidade")
+def get_colaboradores_lista_unidade(
+    mes_ref: Optional[str] = None,
+    unidade: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna lista detalhada de colaboradores por unidade - VERSÃO OTIMIZADA.
+
+    Usado no Dashboard de Unidades para exibir tabela completa de colaboradores.
+
+    Args:
+        mes_ref: Mês de referência (formato YYYY-MM). Se não fornecido, usa o mês mais recente.
+        unidade: Nome da unidade (opcional). Se fornecido, filtra apenas colaboradores dessa unidade.
+
+    Returns:
+        Lista de colaboradores com dados completos de meta, realizado, NPS, vendas e comissões
+    """
+    try:
+        from app.models.resultado_csat import ResultadoCSAT
+        from app.models.resultados_campanha import ResultadoCampanha
+
+        print(f"=== [LISTA UNIDADE OTIMIZADA] Buscando colaboradores - Mês: {mes_ref}, Unidade: {unidade} ===")
+
+        # Auto-detectar mês mais recente se não fornecido
+        if not mes_ref:
+            mes_recente = db.query(MetaColaborador.mes_ref).order_by(
+                MetaColaborador.mes_ref.desc()
+            ).first()
+            if mes_recente:
+                mes_ref = mes_recente.mes_ref
+            else:
+                raise HTTPException(status_code=404, detail="Nenhum mês de referência encontrado")
+
+        # Converter formato YYYY-MM para YYYY-MM-01 se necessário
+        if mes_ref and len(mes_ref) == 7:  # Formato YYYY-MM
+            mes_ref = f"{mes_ref}-01"
+
+        print(f"[LISTA UNIDADE] Usando mês: {mes_ref}")
+
+        # Buscar colaboradores com meta no mês especificado
+        query = db.query(MetaColaborador).filter(
+            MetaColaborador.mes_ref == mes_ref
+        )
+
+        # Filtrar por unidade se fornecida
+        if unidade and unidade.strip():
+            query = query.filter(MetaColaborador.unidade == unidade)
+            print(f"[LISTA UNIDADE] Filtrando por unidade: {unidade}")
+
+        colaboradores_meta = query.limit(100).all()  # Limitar a 100 para evitar sobrecarga
+        print(f"[LISTA UNIDADE] Encontrados {len(colaboradores_meta)} colaboradores")
+
+        # Extrair IDs válidos
+        ids_eyal = []
+        meta_por_id = {}
+        for meta_colab in colaboradores_meta:
+            if meta_colab.id_eyal and meta_colab.id_eyal.isdigit():
+                id_eyal = int(meta_colab.id_eyal)
+                ids_eyal.append(id_eyal)
+                meta_por_id[id_eyal] = meta_colab
+
+        if not ids_eyal:
+            return {"colaboradores": [], "total": 0, "mes_ref": mes_ref, "unidade": unidade}
+
+        print(f"[LISTA UNIDADE] Processando {len(ids_eyal)} IDs válidos")
+
+        # BUSCA EM BATCH - Realizado (painel)
+        paineis_dict = {}
+        try:
+            paineis = db.query(PainelResultadosDiarios).filter(
+                PainelResultadosDiarios.id_eyal.in_([str(id) for id in ids_eyal]),
+                PainelResultadosDiarios.mes_ref == mes_ref
+            ).all()
+            for painel in paineis:
+                if painel.id_eyal and painel.id_eyal.isdigit():
+                    paineis_dict[int(painel.id_eyal)] = painel
+            print(f"[LISTA UNIDADE] Carregados {len(paineis_dict)} painéis")
+        except Exception as e:
+            print(f"[LISTA UNIDADE] Erro ao carregar painéis: {e}")
+
+        # BUSCA EM BATCH - NPS
+        nps_dict = {}
+        try:
+            nps_results = db.query(ResultadoCSAT).filter(
+                ResultadoCSAT.cod_usuario.in_(ids_eyal),
+                ResultadoCSAT.mes == mes_ref
+            ).all()
+            for nps in nps_results:
+                if nps.cod_usuario:
+                    nps_dict[nps.cod_usuario] = float(nps.nps) if nps.nps else 0.0
+            print(f"[LISTA UNIDADE] Carregados {len(nps_dict)} registros NPS")
+        except Exception as e:
+            print(f"[LISTA UNIDADE] Erro ao carregar NPS: {e}")
+
+        # BUSCA EM BATCH - Realizados por tipo
+        realizados_dict = {}
+        try:
+            realizados = db.query(RealizadoColaborador).filter(
+                RealizadoColaborador.id_eyal.in_(ids_eyal),
+                RealizadoColaborador.mes_ref == mes_ref
+            ).all()
+            for realizado in realizados:
+                if realizado.id_eyal not in realizados_dict:
+                    realizados_dict[realizado.id_eyal] = []
+                realizados_dict[realizado.id_eyal].append(realizado)
+            print(f"[LISTA UNIDADE] Carregados realizados de {len(realizados_dict)} colaboradores")
+        except Exception as e:
+            print(f"[LISTA UNIDADE] Erro ao carregar realizados: {e}")
+
+        # BUSCA EM BATCH - Comissões
+        comissoes_dict = {}
+        try:
+            comissoes = db.query(ResultadoCampanha).filter(
+                ResultadoCampanha.id_eyal.in_([str(id) for id in ids_eyal]),
+                ResultadoCampanha.mes_ref == mes_ref
+            ).all()
+            for comissao in comissoes:
+                if comissao.id_eyal and comissao.id_eyal.isdigit():
+                    comissoes_dict[int(comissao.id_eyal)] = comissao
+            print(f"[LISTA UNIDADE] Carregadas {len(comissoes_dict)} comissões")
+        except Exception as e:
+            print(f"[LISTA UNIDADE] Erro ao carregar comissões: {e}")
+
+        # Processar colaboradores com dados já carregados
+        colaboradores_detalhados = []
+        for id_eyal in ids_eyal:
+            try:
+                meta_colab = meta_por_id[id_eyal]
+
+                # Realizado
+                realizado_total = 0.0
+                if id_eyal in paineis_dict:
+                    realizado_total = float(paineis_dict[id_eyal].realizado_final or 0)
+
+                # Calcular valores
+                meta_total = float(meta_colab.meta_final or 0)
+                meta_diaria = float(meta_colab.meta_diaria or 0)
+                saldo = realizado_total - meta_total
+                percentual_atual = (realizado_total / meta_total * 100) if meta_total > 0 else 0
+
+                # NPS
+                nps_valor = nps_dict.get(id_eyal, 0.0)
+
+                # Vendas por categoria
+                vendas_odonto = 0
+                vendas_marcuz = 0
+                vendas_checkup = 0
+
+                if id_eyal in realizados_dict:
+                    for realizado in realizados_dict[id_eyal]:
+                        tipo = (realizado.tipo_grupo or "").upper()
+                        quantidade = int(realizado.total_registros or 0)
+
+                        if "ODONTO" in tipo:
+                            vendas_odonto += quantidade
+                        elif "EXAME" in tipo or "MARCUZ" in tipo:
+                            vendas_marcuz += quantidade
+                        elif "CHECKUP" in tipo or "CHECK" in tipo:
+                            vendas_checkup += quantidade
+
+                vendas_total = vendas_odonto + vendas_marcuz + vendas_checkup
+
+                # Comissão
+                comissao_total = 0.0
+                comissao_producao = 0.0
+                if id_eyal in comissoes_dict:
+                    comissao = comissoes_dict[id_eyal]
+                    comissao_total = float(comissao.valor_a_pagar or 0)
+                    comissao_producao = float(comissao.valor_pago_producao or 0)
+
+                # Montar objeto do colaborador
+                colaborador_dados = {
+                    "id_eyal": str(id_eyal),
+                    "nome": meta_colab.nome,
+                    "cargo": meta_colab.cargo or "Não informado",
+                    "meta_total": meta_total,
+                    "meta_diaria": meta_diaria,
+                    "realizado": realizado_total,
+                    "saldo": saldo,
+                    "percentual_atual": round(percentual_atual, 2),
+                    "previsao_atingimento": realizado_total,
+                    "percentual_projetado": round(percentual_atual, 2),
+                    "nps": round(nps_valor, 2),
+                    "vendas": {
+                        "odonto": vendas_odonto,
+                        "marcuz": vendas_marcuz,
+                        "checkup": vendas_checkup,
+                        "total": vendas_total
+                    },
+                    "comissao": {
+                        "total": comissao_total,
+                        "valor_pago_producao": comissao_producao
+                    }
+                }
+
+                colaboradores_detalhados.append(colaborador_dados)
+
+            except Exception as e:
+                print(f"[LISTA UNIDADE] Erro ao processar colaborador {id_eyal}: {e}")
+                continue
+
+        print(f"[LISTA UNIDADE] Retornando {len(colaboradores_detalhados)} colaboradores processados")
+
+        return {
+            "colaboradores": colaboradores_detalhados,
+            "total": len(colaboradores_detalhados),
+            "mes_ref": mes_ref,
+            "unidade": unidade
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[LISTA UNIDADE] Erro geral: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar lista de colaboradores: {str(e)}"
+        )
+
+
+# ========================================
 # ROTAS LEGADAS (mantidas para compatibilidade)
 # ========================================
 

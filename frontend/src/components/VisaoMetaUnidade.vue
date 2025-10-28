@@ -122,15 +122,15 @@
           </div>
         </div>
       </div>
-
-      <!-- Rankings por Categoria -->
+<!--
+       Rankings por Categoria
       <div class="rankings-section">
         <h3 class="section-title">
           <i class="fas fa-medal"></i>
           Rankings por Categoria
         </h3>
         <div class="rankings-grid">
-          <!-- Ranking Odonto -->
+           Ranking Odonto
           <div class="ranking-card odonto">
             <div class="ranking-header">
               <div class="ranking-icon">
@@ -157,7 +157,7 @@
             </div>
           </div>
 
-          <!-- Ranking Exames -->
+           Ranking Exames
           <div class="ranking-card exames">
             <div class="ranking-header">
               <div class="ranking-icon">
@@ -184,7 +184,7 @@
             </div>
           </div>
 
-          <!-- Ranking Consultas -->
+           Ranking Consultas
           <div class="ranking-card consultas">
             <div class="ranking-header">
               <div class="ranking-icon">
@@ -211,7 +211,7 @@
             </div>
           </div>
 
-          <!-- Ranking Checkups -->
+           Ranking Checkups
           <div class="ranking-card checkups">
             <div class="ranking-header">
               <div class="ranking-icon">
@@ -238,7 +238,7 @@
             </div>
           </div>
 
-          <!-- Ranking BabyClick -->
+           Ranking BabyClick
           <div class="ranking-card babyclick">
             <div class="ranking-header">
               <div class="ranking-icon">
@@ -255,6 +255,157 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    -->
+      <!-- Tabela Detalhada de Colaboradores -->
+      <div class="colaboradores-detalhados-section">
+        <h3 class="section-title">
+          <i class="fas fa-users-cog"></i>
+          Colaboradores da Unidade - Visão Detalhada
+        </h3>
+
+        <!-- Loading -->
+        <div v-if="carregandoColaboradores" class="loading-colaboradores">
+          <div class="spinner"></div>
+          <p>Carregando colaboradores...</p>
+        </div>
+
+        <!-- Tabela de Colaboradores -->
+        <div v-else-if="colaboradoresDetalhados.length > 0" class="tabela-colaboradores-container">
+          <div class="tabela-colaboradores-wrapper">
+            <table class="tabela-colaboradores">
+              <thead>
+                <tr>
+                  <th class="col-nome">
+                    <i class="fas fa-user"></i>
+                    Nome
+                  </th>
+                  <th class="col-cargo">
+                    <i class="fas fa-briefcase"></i>
+                    Cargo
+                  </th>
+                  <th class="col-meta">
+                    <i class="fas fa-bullseye"></i>
+                    Meta Total
+                  </th>
+                  <th class="col-realizado">
+                    <i class="fas fa-chart-line"></i>
+                    Realizado
+                  </th>
+                  <th class="col-saldo">
+                    <i class="fas fa-balance-scale"></i>
+                    Saldo
+                  </th>
+                  <th class="col-percentual">
+                    <i class="fas fa-percent"></i>
+                    % Atual
+                  </th>
+                  <th class="col-projecao">
+                    <i class="fas fa-chart-area"></i>
+                    Projeção
+                  </th>
+                  <th class="col-nps">
+                    <i class="fas fa-star"></i>
+                    NPS
+                  </th>
+                  <th class="col-vendas">
+                    <i class="fas fa-shopping-cart"></i>
+                    Vendas
+                  </th>
+                  <th class="col-comissao">
+                    <i class="fas fa-dollar-sign"></i>
+                    Comissão
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(colab, index) in colaboradoresDetalhados" :key="colab.id_eyal"
+                    :class="{ 'linha-destaque': index < 3 }">
+                  <td class="col-nome">
+                    <div class="colaborador-nome">
+                      <span class="nome-principal">{{ colab.nome }}</span>
+                      <span class="id-eyal">ID: {{ colab.id_eyal }}</span>
+                    </div>
+                  </td>
+                  <td class="col-cargo">
+                    <span class="badge-cargo">{{ colab.cargo }}</span>
+                  </td>
+                  <td class="col-meta">
+                    <span class="valor-destaque">{{ formatarMoeda(colab.meta_total) }}</span>
+                    <span class="valor-secundario">Diária: {{ formatarMoeda(colab.meta_diaria) }}</span>
+                  </td>
+                  <td class="col-realizado">
+                    <span class="valor-destaque positivo">{{ formatarMoeda(colab.realizado) }}</span>
+                  </td>
+                  <td class="col-saldo">
+                    <span :class="['valor-destaque', colab.saldo >= 0 ? 'positivo' : 'negativo']">
+                      {{ formatarMoeda(colab.saldo) }}
+                    </span>
+                  </td>
+                  <td class="col-percentual">
+                    <div class="percentual-wrapper">
+                      <span :class="['percentual-valor', getClassePercentual(colab.percentual_atual)]">
+                        {{ colab.percentual_atual.toFixed(1) }}%
+                      </span>
+                      <div class="mini-progress-bar">
+                        <div class="mini-progress-fill"
+                             :style="{ width: Math.min(colab.percentual_atual, 100) + '%' }"
+                             :class="getClassePercentual(colab.percentual_atual)"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="col-projecao">
+                    <span class="valor-destaque">{{ formatarMoeda(colab.previsao_atingimento) }}</span>
+                    <span class="valor-secundario">{{ (colab.percentual_projetado || 0).toFixed(1) }}%</span>
+                  </td>
+                  <td class="col-nps">
+                    <span :class="['nps-valor', getClasseNPS(Number(colab.nps))]">
+                      {{ Number(colab.nps || 0).toFixed(0) }}
+                    </span>
+                  </td>
+                  <td class="col-vendas">
+                    <div class="vendas-detalhes">
+                      <span class="venda-item">O: {{ colab.vendas.odonto }}</span>
+                      <span class="venda-item">ORC: {{ colab.vendas.marcuz }}</span>
+                      <span class="venda-item">C: {{ colab.vendas.checkup }}</span>
+                      <span class="venda-total">Total: {{ colab.vendas.total }}</span>
+                    </div>
+                  </td>
+                  <td class="col-comissao">
+                    <span class="valor-destaque comissao">{{ formatarMoeda(colab.comissao.total) }}</span>
+                    <span class="valor-secundario">Prod: {{ formatarMoeda(colab.comissao.valor_pago_producao) }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Resumo da Tabela -->
+          <div class="tabela-resumo">
+            <div class="resumo-item">
+              <i class="fas fa-users"></i>
+              <span>{{ colaboradoresDetalhados.length }} colaboradores</span>
+            </div>
+            <div class="resumo-item">
+              <i class="fas fa-bullseye"></i>
+              <span>Meta Total: {{ formatarMoeda(totalMetaColaboradores) }}</span>
+            </div>
+            <div class="resumo-item">
+              <i class="fas fa-chart-line"></i>
+              <span>Realizado Total: {{ formatarMoeda(totalRealizadoColaboradores) }}</span>
+            </div>
+            <div class="resumo-item">
+              <i class="fas fa-percent"></i>
+              <span>Média: {{ mediaPercentualColaboradores.toFixed(1) }}%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estado vazio -->
+        <div v-else class="colaboradores-vazio">
+          <i class="fas fa-users-slash"></i>
+          <p>Nenhum colaborador encontrado para esta unidade no período selecionado.</p>
         </div>
       </div>
 
@@ -350,7 +501,11 @@ export default {
         checkup: 0,
         drCentral: 0,
         babyclick: 0
-      }
+      },
+
+      // Colaboradores detalhados
+      colaboradoresDetalhados: [],
+      carregandoColaboradores: false
     };
   },
   computed: {
@@ -386,10 +541,24 @@ export default {
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
       ];
       return `${meses[parseInt(mes) - 1]} ${ano}`;
+    },
+
+    // Computed properties para a tabela de colaboradores
+    totalMetaColaboradores() {
+      return this.colaboradoresDetalhados.reduce((sum, c) => sum + (c.meta_total || 0), 0);
+    },
+    totalRealizadoColaboradores() {
+      return this.colaboradoresDetalhados.reduce((sum, c) => sum + (c.realizado || 0), 0);
+    },
+    mediaPercentualColaboradores() {
+      if (this.colaboradoresDetalhados.length === 0) return 0;
+      const soma = this.colaboradoresDetalhados.reduce((sum, c) => sum + (c.percentual_atual || 0), 0);
+      return soma / this.colaboradoresDetalhados.length;
     }
   },
   mounted() {
     this.carregarDadosUnidade();
+    this.carregarColaboradoresDetalhados();
   },
   methods: {
     async carregarDadosUnidade() {
@@ -452,27 +621,22 @@ export default {
     async atualizarDados() {
       console.log('Atualizando dados para unidade:', this.unidadeSelecionada, 'período:', this.dataFiltro);
       this.carregando = true;
-      
+
+      // Limpa o estado dos dados antes de atualizar
+      this.dadosUnidade = { totalColaboradores: 0, metaTotal: 0, totalRealizado: 0 };
+      this.colaboradoresDetalhados = [];
+
       try {
-        // Construir URL com filtros para dados reais
-        let url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/dashboard`;
-        const params = new URLSearchParams();
-        
-        if (this.dataFiltro) {
-          params.append('mes_ref', this.dataFiltro);
-        }
-        // Se não houver filtro, o backend já usa mês atual como padrão
-        
-        if (params.toString()) {
-          url += '?' + params.toString();
-        }
-        
+        // Sempre usa o mês de referência atual do filtro
+        const mesRef = this.dataFiltro;
+        let url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/metas-unidades-real/dashboard?mes_ref=${mesRef}`;
+
         const response = await fetch(url);
-        
+
         if (response.ok) {
           const data = await response.json();
           console.log('Dados atualizados da API real:', data);
-          
+
           // Atualizar dados da unidade
           if (data.resumo) {
             this.dadosUnidade = {
@@ -481,12 +645,12 @@ export default {
               totalRealizado: data.resumo.realizado_total || 0
             };
           }
-          
+
           // Se uma unidade específica foi selecionada, filtrar os dados
           if (this.unidadeSelecionada && data.unidades) {
             const unidadeNome = this.unidades.find(u => u.id == this.unidadeSelecionada)?.nome;
             const unidadeData = data.unidades.find(u => u.unidade === unidadeNome);
-            
+
             if (unidadeData) {
               this.dadosUnidade = {
                 totalColaboradores: 1, // Uma unidade específica
@@ -495,7 +659,7 @@ export default {
               };
             }
           }
-          
+
           // Atualizar unidades disponíveis
           if (data.unidades && data.unidades.length > 0) {
             const unidadesUnicas = [...new Set(data.unidades.map(u => u.unidade))];
@@ -504,15 +668,16 @@ export default {
               nome: nome
             }));
           }
-          
-          // Carregar rankings após atualizar dados
+
+          // Carregar rankings e colaboradores detalhados usando o mesmo mês de referência
           await this.carregarRankings();
-          
+          await this.carregarColaboradoresDetalhados();
+
         } else {
           console.error('Erro na resposta da API:', response.status, response.statusText);
           await this.carregarDadosUnidade(); // Fallback para dados gerais
         }
-        
+
       } catch (error) {
         console.error('Erro ao atualizar dados:', error);
         await this.carregarDadosUnidade(); // Fallback para dados gerais
@@ -624,7 +789,189 @@ export default {
         babyclick: 0
       };
     },
-    
+
+    async carregarColaboradoresDetalhados() {
+      this.carregandoColaboradores = true;
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+        // Buscar colaboradores com metas
+        console.log('📋 Carregando colaboradores com metas...');
+        const response = await fetch(`${API_BASE_URL}/metas/colaboradores-com-metas`);
+
+        if (!response.ok) {
+          console.error('❌ Erro ao buscar colaboradores:', response.status);
+          this.colaboradoresDetalhados = [];
+          return;
+        }
+
+        let colaboradores = await response.json();
+        console.log('📋 Total de colaboradores com metas:', colaboradores.length);
+
+        // Filtrar por unidade se selecionada
+        if (this.unidadeSelecionada) {
+          const unidadeNome = this.unidades.find(u => u.id == this.unidadeSelecionada)?.nome;
+          if (unidadeNome) {
+            colaboradores = colaboradores.filter(c => c.unidade === unidadeNome);
+            console.log(`📋 Colaboradores filtrados para unidade "${unidadeNome}":`, colaboradores.length);
+          }
+        }
+
+        // Para cada colaborador, buscar dados detalhados e aproveitar todos os campos do endpoint
+        const colaboradoresDetalhados = [];
+
+        for (const colab of colaboradores) {
+          try {
+            const idEyal = colab.id_eyal;
+            if (!idEyal) continue;
+
+            let mesRef = this.dataFiltro || '';
+            if (mesRef && mesRef.length === 7) {
+              mesRef = `${mesRef}-01`;
+            }
+
+            // Realizado
+            const urlRealizado = `${API_BASE_URL}/realizado/painel/${idEyal}${mesRef ? `?mes_ref=${mesRef}` : ''}`;
+            const respRealizado = await fetch(urlRealizado);
+            let data = respRealizado.ok ? await respRealizado.json() : {};
+
+
+            // Buscar meta individual do colaborador para o mes_ref atual
+            let metaTotal = 0;
+            let metaDiaria = 0;
+            const urlMeta = `${API_BASE_URL}/metas/colaborador/${idEyal}?mes_ref=${mesRef}`;
+            const respMeta = await fetch(urlMeta);
+            if (respMeta.ok) {
+              const metaData = await respMeta.json();
+              if (Array.isArray(metaData) && metaData.length > 0) {
+                metaTotal = metaData[0].meta_final || 0;
+                metaDiaria = metaData[0].meta_diaria || 0;
+              }
+            }
+
+            // Projeção (usa realizado_final e percentual, ou calcula se necessário)
+            let projecao = 0;
+            if (data.realizado?.realizado_final && data.realizado?.percentual_atingido) {
+              projecao = data.realizado.realizado_final / (data.realizado.percentual_atingido / 100);
+            }
+
+            // NPS
+            let nps = 0;
+            const urlNPS = `${API_BASE_URL}/nps/colaborador/${idEyal}?mes_ref=${mesRef.substring(0,7)}`;
+            const respNPS = await fetch(urlNPS);
+            if (respNPS.ok) {
+              const npsData = await respNPS.json();
+              if (npsData.success && npsData.nps_data && npsData.nps_data.nps !== null) {
+                nps = Number(npsData.nps_data.nps).toFixed(2);
+              } else {
+                nps = 0;
+              }
+            }
+
+            // Vendas
+            let vendas = { odonto: 0, marcuz: 0, checkup: 0, total: 0 };
+            const urlVendas = `${API_BASE_URL}/vendas/colaborador/${idEyal}?mes_ref=${mesRef.substring(0,7)}`;
+            const respVendas = await fetch(urlVendas);
+            if (respVendas.ok) {
+              const vendasData = await respVendas.json();
+              if (vendasData.success && vendasData.resumo) {
+                vendas = {
+                  odonto: vendasData.resumo.odonto || 0,
+                  marcuz: vendasData.resumo.marcuz || 0,
+                  checkup: vendasData.resumo.checkup || 0,
+                  total: vendasData.resumo.total_vendas || 0
+                };
+              }
+            }
+
+            // Comissão
+            let comissao = { total: 0, valor_pago_producao: 0 };
+            const urlComissao = `${API_BASE_URL}/comissao/resumo/${idEyal}?mes_ref=${mesRef}`;
+            const respComissao = await fetch(urlComissao);
+            if (respComissao.ok) {
+              const comissaoData = await respComissao.json();
+              comissao = {
+                total: comissaoData.total_comissao || 0,
+                valor_pago_producao: comissaoData.projecao_meta || 0
+              };
+            }
+
+            colaboradoresDetalhados.push({
+              id_eyal: data.colaborador?.id_eyal || idEyal,
+              nome: data.colaborador?.nome || colab.nome,
+              cargo: data.colaborador?.cargo || colab.cargo || 'Não informado',
+              unidade: data.colaborador?.unidade || colab.unidade || '',
+              meta_total: metaTotal,
+              meta_diaria: metaDiaria,
+              realizado: data.realizado?.realizado_final || 0,
+              realizado_individual: data.realizado?.realizado_individual || 0,
+              saldo: (data.realizado?.realizado_final || 0) - metaTotal,
+              percentual_atual: data.realizado?.percentual_atingido || 0,
+              projecao: projecao,
+              nps: nps,
+              vendas: vendas,
+              comissao: comissao,
+              nivel: data.colaborador?.nivel || '',
+              lider_direto: data.colaborador?.lider_direto || ''
+            });
+          } catch (error) {
+            console.error(`❌ Erro ao processar colaborador ${colab.nome}:`, error);
+          }
+        }
+
+        this.colaboradoresDetalhados = colaboradoresDetalhados;
+        console.log(`✅ ${this.colaboradoresDetalhados.length} colaboradores carregados com dados detalhados`);
+
+          // Pós-processamento: calcular previsao_atingimento e percentual_projetado para cada colaborador
+          this.colaboradoresDetalhados = this.colaboradoresDetalhados.map(colab => {
+            // Previsao Atingimento: se não veio do backend, calcula
+            let previsao_atingimento = 0;
+            if (colab.realizado && colab.percentual_atual) {
+              // Mesma lógica do MetaColaborador.vue
+              previsao_atingimento = colab.percentual_atual > 0
+                ? (colab.realizado / (colab.percentual_atual / 100))
+                : colab.realizado;
+            }
+            // Se já veio do backend, prioriza
+            if (colab.projecao && colab.projecao > 0) {
+              previsao_atingimento = colab.projecao;
+            }
+
+            // Percentual Projetado: (previsao_atingimento / meta_total) * 100
+            let percentual_projetado = 0;
+            if (colab.meta_total && colab.meta_total > 0) {
+              percentual_projetado = (previsao_atingimento / colab.meta_total) * 100;
+            }
+
+            return {
+              ...colab,
+              previsao_atingimento,
+              percentual_projetado
+            };
+          });
+
+      } catch (error) {
+        console.error('❌ Erro ao carregar colaboradores detalhados:', error);
+        this.colaboradoresDetalhados = [];
+      } finally {
+        this.carregandoColaboradores = false;
+      }
+    },
+
+    getClassePercentual(percentual) {
+      if (percentual >= 100) return 'excelente';
+      if (percentual >= 80) return 'bom';
+      if (percentual >= 60) return 'regular';
+      return 'critico';
+    },
+
+    getClasseNPS(nps) {
+      if (nps >= 75) return 'excelente';
+      if (nps >= 50) return 'bom';
+      if (nps >= 0) return 'regular';
+      return 'critico';
+    },
+
     formatarMoeda(valor) {
       if (typeof valor !== 'number') return 'R$ 0,00';
       return new Intl.NumberFormat('pt-BR', {
@@ -1212,6 +1559,330 @@ export default {
 }
 
 .acao-item i {
+  color: #667eea;
+}
+
+/* Tabela de Colaboradores Detalhados */
+.colaboradores-detalhados-section {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e9ecef;
+}
+
+.loading-colaboradores {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #667eea;
+}
+
+.loading-colaboradores .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e9ecef;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.colaboradores-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #6c757d;
+}
+
+.colaboradores-vazio i {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  opacity: 0.3;
+}
+
+.tabela-colaboradores-container {
+  margin-top: 20px;
+}
+
+.tabela-colaboradores-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.tabela-colaboradores {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 0.9rem;
+}
+
+.tabela-colaboradores thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.tabela-colaboradores thead th {
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.tabela-colaboradores thead th i {
+  margin-right: 6px;
+  font-size: 0.9rem;
+}
+
+.tabela-colaboradores tbody tr {
+  border-bottom: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.tabela-colaboradores tbody tr:hover {
+  background: #f8f9fa;
+  transform: translateX(2px);
+}
+
+.tabela-colaboradores tbody tr.linha-destaque {
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.tabela-colaboradores tbody tr.linha-destaque:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.tabela-colaboradores tbody td {
+  padding: 15px 12px;
+  vertical-align: middle;
+}
+
+/* Colunas específicas */
+.col-nome {
+  min-width: 200px;
+  max-width: 250px;
+}
+
+.colaborador-nome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nome-principal {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+.id-eyal {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.col-cargo {
+  min-width: 150px;
+}
+
+.badge-cargo {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.col-meta,
+.col-realizado,
+.col-saldo,
+.col-projecao,
+.col-comissao {
+  min-width: 130px;
+}
+
+.valor-destaque {
+  display: block;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #2c3e50;
+  margin-bottom: 2px;
+}
+
+.valor-destaque.positivo {
+  color: #28a745;
+}
+
+.valor-destaque.negativo {
+  color: #dc3545;
+}
+
+.valor-destaque.comissao {
+  color: #667eea;
+}
+
+.valor-secundario {
+  display: block;
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.col-percentual {
+  min-width: 140px;
+}
+
+.percentual-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.percentual-valor {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.percentual-valor.excelente {
+  color: #28a745;
+}
+
+.percentual-valor.bom {
+  color: #17a2b8;
+}
+
+.percentual-valor.regular {
+  color: #ffc107;
+}
+
+.percentual-valor.critico {
+  color: #dc3545;
+}
+
+.mini-progress-bar {
+  height: 6px;
+  background-color: #e9ecef;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s ease;
+}
+
+.mini-progress-fill.excelente {
+  background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+}
+
+.mini-progress-fill.bom {
+  background: linear-gradient(90deg, #17a2b8 0%, #138496 100%);
+}
+
+.mini-progress-fill.regular {
+  background: linear-gradient(90deg, #ffc107 0%, #ffb300 100%);
+}
+
+.mini-progress-fill.critico {
+  background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
+}
+
+.col-nps {
+  min-width: 80px;
+  text-align: center;
+}
+
+.nps-valor {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.nps-valor.excelente {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}
+
+.nps-valor.bom {
+  background: rgba(23, 162, 184, 0.15);
+  color: #17a2b8;
+}
+
+.nps-valor.regular {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.nps-valor.critico {
+  background: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+}
+
+.col-vendas {
+  min-width: 180px;
+}
+
+.vendas-detalhes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.venda-item {
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.venda-total {
+  font-weight: 700;
+  color: #2c3e50;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #e9ecef;
+}
+
+/* Resumo da Tabela */
+.tabela-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+}
+
+.resumo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.resumo-item i {
+  font-size: 1.2rem;
   color: #667eea;
 }
 

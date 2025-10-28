@@ -960,6 +960,9 @@ export default {
       // cargo_id nunca string vazia
       let cargo_id = this.form.cargo_id;
       if (cargo_id === '' || cargo_id === undefined) cargo_id = null;
+      // tipo_contrato: converte string vazia para null
+      let tipo_contrato = this.form.tipo_contrato;
+      if (tipo_contrato === '' || tipo_contrato === undefined) tipo_contrato = null;
       // Garante formato correto para data_admissao
       let dataAdmissaoFormatada = '';
       if (this.form.data_admissao) {
@@ -980,7 +983,7 @@ export default {
         email: this.form.email || '',
         cpf: this.form.cpf,
         id_eyal: this.form.id_eyal,
-        tipo_contrato: this.form.tipo_contrato,
+        tipo_contrato: tipo_contrato,
         data_afastamento: this.form.data_afastamento,
         data_retorno: this.form.data_retorno,
         grupos_email_ids,
