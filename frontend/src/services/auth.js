@@ -2,7 +2,18 @@ import axios from 'axios';
 
 const USER_KEY = 'current_user';
 
+// Flag para evitar múltiplas chamadas simultâneas
+let isLoadingUser = false;
+
 export async function loadCurrentUser() {
+  // Se já está carregando ou se não há token, retornar null
+  const token = localStorage.getItem('token');
+  if (isLoadingUser || !token) {
+    return null;
+  }
+
+  isLoadingUser = true;
+
   try {
     const res = await axios.get('/me');
     const user = res.data;
@@ -30,10 +41,12 @@ export async function loadCurrentUser() {
       // fallback para navegadores antigos
       window.dispatchEvent(new Event('auth:updated'));
     }
+    isLoadingUser = false;
     return user;
   } catch (err) {
     console.warn('Não foi possível carregar usuário atual:', err && err.response ? err.response.data : err.message);
     localStorage.removeItem(USER_KEY);
+    isLoadingUser = false;
     return null;
   }
 }

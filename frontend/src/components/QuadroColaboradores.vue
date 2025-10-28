@@ -570,14 +570,6 @@ export default {
       this.carregando = false;
     },
     async editarColaborador(colaborador) {
-      console.log('Editando colaborador:', colaborador);
-      console.log('Setores disponíveis:', this.setores);
-      console.log('Setores do colaborador:', colaborador.setores);
-      console.log('Data afastamento original:', colaborador.data_afastamento);
-      console.log('Data retorno original:', colaborador.data_retorno);
-      console.log('Motivo afastamento original:', colaborador.motivo_afastamento);
-      console.log('Líder direto ID do colaborador:', colaborador.lider_direto);
-      
       // Carrega a lista de líderes ANTES de abrir o modal
       await this.carregarListaDeLideres();
       
@@ -587,9 +579,7 @@ export default {
         // Agora os setores vêm como objetos com id e nome
         setorId = colaborador.setores[0].id;
       }
-      
-      console.log('Setor ID selecionado para o modal:', setorId);
-      
+
       this.colaboradorEditando = {
         id: colaborador.id,
         nome: colaborador.nome || '',
@@ -626,20 +616,6 @@ export default {
         tipo_pgto: colaborador.meta?.tipo_pgto ?? ''
       };
       
-      console.log('=== DEBUG TIPO_CONTRATO ===');
-      console.log('Colaborador completo:', JSON.stringify(colaborador, null, 2));
-      console.log('tipo_contrato do colaborador original:', colaborador.tipo_contrato);
-      console.log('Tipo do tipo_contrato:', typeof colaborador.tipo_contrato);
-      console.log('tipo_contrato no colaboradorEditando:', this.colaboradorEditando.tipo_contrato);
-      console.log('========================');
-      console.log('Colaborador editando preenchido:', this.colaboradorEditando);
-      console.log('Líder direto ID atribuído:', this.colaboradorEditando.lider_direto_id);
-
-      console.log('Objeto colaboradorEditando criado:', this.colaboradorEditando);
-      console.log('Data afastamento formatada:', this.colaboradorEditando.data_afastamento);
-      console.log('Data retorno formatada:', this.colaboradorEditando.data_retorno);
-      console.log('Motivo processado:', this.colaboradorEditando.motivo_afastamento);
-      console.log('Motivo outros:', this.colaboradorEditando.motivo_outros);
       
       this.showModal = true;
     },
@@ -750,20 +726,6 @@ export default {
           tipo_pgto: this.colaboradorEditando.tipo_pgto || null
         };
 
-        console.log('=== DEBUG ANTES DE ENVIAR ===');
-        console.log('tipo_contrato no colaboradorEditando:', this.colaboradorEditando.tipo_contrato);
-        console.log('tipo_contrato no payload:', payload.tipo_contrato);
-        console.log('===========================');
-        console.log('Payload sendo enviado:', payload);
-        console.log('Dados do colaborador sendo editado:', this.colaboradorEditando);
-        console.log('=== PAYLOAD DEBUG ===');
-        console.log('Payload completo enviado no PUT:', JSON.stringify(payload, null, 2));
-        console.log('ID Eyal no payload:', payload.id_eyal);
-        console.log('ID Eyal no colaboradorEditando:', this.colaboradorEditando.id_eyal);
-        console.log('Tipo da meta:', typeof payload.meta, 'Valor:', payload.meta);
-        console.log('Tipo do tipo_pgto:', typeof payload.tipo_pgto, 'Valor:', payload.tipo_pgto);
-        console.log('setores_ids:', payload.setores_ids);
-        console.log('=====================');
         
         const response = await fetch(`${API_BASE_URL}/funcionarios/${this.colaboradorEditando.id}`, {
           method: 'PUT',
