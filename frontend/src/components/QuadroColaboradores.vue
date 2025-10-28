@@ -612,7 +612,7 @@ export default {
         cpf: colaborador.cpf ? colaborador.cpf : '',
         id_eyal: colaborador.id_eyal || '',
         data_afastamento: colaborador.data_afastamento || '',
-        tipo_contrato: colaborador.tipo_contrato || '',
+        tipo_contrato: colaborador.tipo_contrato || null,
         data_retorno: colaborador.data_retorno || '',
         // Tratar motivo_afastamento - se começar com "Outros:", separar
         motivo_afastamento: colaborador.motivo_afastamento && colaborador.motivo_afastamento.startsWith('Outros:') 
@@ -626,9 +626,15 @@ export default {
         tipo_pgto: colaborador.meta?.tipo_pgto ?? ''
       };
       
+      console.log('=== DEBUG TIPO_CONTRATO ===');
+      console.log('Colaborador completo:', JSON.stringify(colaborador, null, 2));
+      console.log('tipo_contrato do colaborador original:', colaborador.tipo_contrato);
+      console.log('Tipo do tipo_contrato:', typeof colaborador.tipo_contrato);
+      console.log('tipo_contrato no colaboradorEditando:', this.colaboradorEditando.tipo_contrato);
+      console.log('========================');
       console.log('Colaborador editando preenchido:', this.colaboradorEditando);
       console.log('Líder direto ID atribuído:', this.colaboradorEditando.lider_direto_id);
-      
+
       console.log('Objeto colaboradorEditando criado:', this.colaboradorEditando);
       console.log('Data afastamento formatada:', this.colaboradorEditando.data_afastamento);
       console.log('Data retorno formatada:', this.colaboradorEditando.data_retorno);
@@ -732,7 +738,7 @@ export default {
           data_admissao: this.colaboradorEditando.data_admissao || '',
           data_inativado: this.colaboradorEditando.data_inativado || '',
           data_afastamento: this.colaboradorEditando.data_afastamento || '',
-          tipo_contrato: this.colaboradorEditando.tipo_contrato || '',
+          tipo_contrato: this.colaboradorEditando.tipo_contrato || null,
           data_retorno: this.colaboradorEditando.data_retorno || '',
           // Combinar motivo padrão com especificação quando for "Outros"
           motivo_afastamento: this.colaboradorEditando.motivo_afastamento === 'Outros' 
@@ -744,6 +750,10 @@ export default {
           tipo_pgto: this.colaboradorEditando.tipo_pgto || null
         };
 
+        console.log('=== DEBUG ANTES DE ENVIAR ===');
+        console.log('tipo_contrato no colaboradorEditando:', this.colaboradorEditando.tipo_contrato);
+        console.log('tipo_contrato no payload:', payload.tipo_contrato);
+        console.log('===========================');
         console.log('Payload sendo enviado:', payload);
         console.log('Dados do colaborador sendo editado:', this.colaboradorEditando);
         console.log('=== PAYLOAD DEBUG ===');
@@ -848,7 +858,8 @@ export default {
           'supervisor de atendimento', 
           'monitor',
           'orientador',
-          'coordenador'
+          'coordenador',
+          'coordenador(a)'
         ];
         
         // Filtra apenas funcionários ativos com funções de liderança
