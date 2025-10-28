@@ -60,7 +60,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hora
+ACCESS_TOKEN_EXPIRE_MINUTES = 15  # 15 minutos
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
