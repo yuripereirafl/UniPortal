@@ -56,9 +56,6 @@ if [ "$USE_COMPOSE" = "true" ] || [ "$USE_COMPOSE" = "True" ]; then
   fi
 fi
 
-echo "Parando containers antigos (se existirem)..."
-sudo docker compose down || true
-
 echo "Subindo containers (rebuild)..."
 sudo docker compose up -d --build --remove-orphans
 
@@ -92,36 +89,6 @@ fi
 
 # Carregar variáveis do .env
 source .env
-
-# Parar containers existentes
-echo "🛑 Parando containers existentes..."
-docker-compose down
-
-# Remover imagens antigas (opcional)
-read -p "Deseja remover imagens antigas? (y/n): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🗑️ Removendo imagens antigas..."
-    docker-compose down --rmi all
-fi
-
-# Construir e iniciar serviços
-echo "🔨 Construindo e iniciando serviços..."
-docker-compose up --build -d
-
-# Verificar status
-echo "📊 Status dos containers:"
-docker-compose ps
-
-# Mostrar logs (últimas 20 linhas)
-echo "📝 Logs dos serviços:"
-docker-compose logs --tail=20
-
-# Detectar IP do host para exibir URLs corretas
-HOST_IP=${DB_HOST:-localhost}
-if [ "$HOST_IP" = "db" ]; then
-    HOST_IP="localhost"
-fi
 
 echo ""
 echo "🚀 Deploy concluído!"

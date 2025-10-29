@@ -6,15 +6,13 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-yourpassword}
-      - DB_NAME=${DB_NAME:-intelix_rh}
-    depends_on:
-      - db
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
     networks:
-      - system-ti-network
+      - UniPortal-main-fresh
 
   frontend:
     build: ./frontend
@@ -26,24 +24,8 @@ services:
     depends_on:
       - backend
     networks:
-      - system-ti-network
-
-  db:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=${DB_NAME:-intelix_rh}
-      - POSTGRES_USER=${DB_USER:-postgres}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-yourpassword}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - system-ti-network
-
-volumes:
-  postgres_data:
+      - UniPortal-main-fresh
 
 networks:
-  system-ti-network:
+  UniPortal-main-fresh:
     driver: bridge
