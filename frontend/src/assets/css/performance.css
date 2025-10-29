@@ -1,0 +1,153 @@
+/* Utilitários CSS para Performance */
+
+/* GPU Acceleration para animações */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* Loading states otimizados */
+.loading-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Virtual scroll container */
+.virtual-scroll-container {
+  height: 400px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.virtual-scroll-spacer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.virtual-scroll-content {
+  position: relative;
+}
+
+/* Otimizações de scroll */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Layout otimizado para tabelas */
+.table-optimized {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-optimized th,
+.table-optimized td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Otimizações de renderização */
+.render-optimized {
+  contain: layout style paint;
+}
+
+.render-optimized-strict {
+  contain: strict;
+}
+
+/* Loading spinner otimizado */
+.loading-spinner-optimized {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--cor-primaria);
+  border-radius: 50%;
+  animation: spin-optimized 1s linear infinite;
+  transform: translateZ(0);
+}
+
+@keyframes spin-optimized {
+  0% { transform: translateZ(0) rotate(0deg); }
+  100% { transform: translateZ(0) rotate(360deg); }
+}
+
+/* Debounce visual feedback */
+.input-debouncing {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.25);
+}
+
+/* Card animations otimizadas */
+.card-hover-optimized {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  will-change: transform, box-shadow;
+}
+
+.card-hover-optimized:hover {
+  transform: translateY(-2px) translateZ(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Lazy loading placeholders */
+.lazy-placeholder {
+  background: #f5f5f5;
+  border-radius: 4px;
+  min-height: 20px;
+  animation: pulse-optimized 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-optimized {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Performance utilities */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.hardware-accelerated {
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Optimized modal overlay */
+.modal-overlay-optimized {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Search input optimized */
+.search-input-optimized {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  will-change: border-color, box-shadow;
+}
+
+.search-input-optimized:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px rgba(20, 65, 121, 0.1);
+  outline: none;
+}

@@ -1,0 +1,6 @@
+version: '3.8'
+
+services:
+  db:
+    # Não mapear porta do container para o host para evitar conflito com Postgres já em execução no host
+    ports: []
