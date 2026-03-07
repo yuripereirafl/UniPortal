@@ -1,13 +1,6 @@
 <template>
   <div id="app">
-    <header class="app-header">
-      <div class="header-left">
-        <!-- logo removed intentionally -->
-      </div>
-      <div class="header-right">
-        <!-- username intentionally hidden -->
-      </div>
-    </header>
+    <!-- Barra superior removida para maximizar espaço e visibilidade -->
     <router-view />
   </div>
 </template>
@@ -45,18 +38,20 @@ export default {
   font-family: var(--font-corpo);
   margin: 0;
   padding: 0;
-  background: var(--cor-branco);
+  background: #050a18;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
-.app-header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:12px 20px;
-  border-bottom:1px solid #eee;
+/* Reset Global para transições suaves */
+* {
+  box-sizing: border-box;
 }
-.logo { height:36px }
-.header-right { display:flex; gap:12px; align-items:center }
-.user-name { font-weight:600; color:#333 }
-.btn-meta { background:#ffd700; border:none; padding:8px 12px; border-radius:8px; cursor:pointer }
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
 </style>

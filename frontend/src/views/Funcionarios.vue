@@ -9,17 +9,11 @@
               <i class="fas fa-users-cog header-icon"></i>
               Gestão de Funcionários
             </h1>
+            <p class="header-subtitle">Gerencie os colaboradores e suas permissões</p>
           </div>
         </div>
         <div class="header-right">
           <div class="controls-group">
-            <div class="filter-control">
-              <label class="toggle-switch">
-                <input type="checkbox" v-model="somenteAtivos" />
-                <span class="slider"></span>
-                <span class="toggle-text">Apenas Ativos</span>
-              </label>
-            </div>
             <div class="search-control">
               <div class="search-wrapper">
                 <i class="fas fa-search search-icon"></i>
@@ -35,25 +29,16 @@
               </div>
             </div>
             <div class="action-buttons">
-              <div class="view-toggle">
-                <button 
-                  class="toggle-btn" 
-                  :class="{ active: viewMode === 'table' }"
-                  @click="viewMode = 'table'"
-                >
-                  <i class="fas fa-table"></i>
-                </button>
-                <button 
-                  class="toggle-btn" 
-                  :class="{ active: viewMode === 'cards' }"
-                  @click="viewMode = 'cards'"
-                >
-                  <i class="fas fa-th-large"></i>
-                </button>
+              <div class="filter-control">
+                <label class="toggle-switch luxe-toggle">
+                  <input type="checkbox" v-model="somenteAtivos" />
+                  <span class="luxe-slider"></span>
+                  <span class="toggle-text">Ativos</span>
+                </label>
               </div>
-              <button class="btn-primary" @click="abrirModalAdicionar">
+              <button class="btn-action-premium" @click="abrirModalAdicionar">
                 <i class="fas fa-plus"></i>
-                <span>Adicionar</span>
+                <span>Adicionar Funcionário</span>
               </button>
             </div>
           </div>
@@ -67,7 +52,8 @@
             <i class="fas fa-users"></i>
           </div>
           <div class="stat-content">
-            <span class="stat-number">{{ loadingStates.funcionarios ? '...' : funcionarios.length }}</span>
+            <span v-if="loadingStates.funcionarios" class="skeleton-dark skeleton-text" style="width: 40px; height: 32px; margin-bottom: 4px;"></span>
+            <span v-else class="stat-number">{{ funcionarios.length }}</span>
             <span class="stat-label">Total</span>
           </div>
         </div>
@@ -76,7 +62,8 @@
             <i class="fas fa-user-check"></i>
           </div>
           <div class="stat-content">
-            <span class="stat-number">{{ loadingStates.funcionarios ? '...' : funcionariosAtivos.length }}</span>
+            <span v-if="loadingStates.funcionarios" class="skeleton-dark skeleton-text" style="width: 40px; height: 32px; margin-bottom: 4px;"></span>
+            <span v-else class="stat-number">{{ funcionariosAtivos.length }}</span>
             <span class="stat-label">Ativos</span>
           </div>
         </div>
@@ -85,7 +72,8 @@
             <i class="fas fa-user-times"></i>
           </div>
           <div class="stat-content">
-            <span class="stat-number">{{ loadingStates.funcionarios ? '...' : (funcionarios.length - funcionariosAtivos.length) }}</span>
+            <span v-if="loadingStates.funcionarios" class="skeleton-dark skeleton-text" style="width: 40px; height: 32px; margin-bottom: 4px;"></span>
+            <span v-else class="stat-number">{{ (funcionarios.length - funcionariosAtivos.length) }}</span>
             <span class="stat-label">Inativos</span>
           </div>
         </div>
@@ -94,7 +82,8 @@
             <i class="fas fa-filter"></i>
           </div>
           <div class="stat-content">
-            <span class="stat-number">{{ loadingStates.funcionarios ? '...' : funcionariosFiltrados.length }}</span>
+            <span v-if="loadingStates.funcionarios" class="skeleton-dark skeleton-text" style="width: 40px; height: 32px; margin-bottom: 4px;"></span>
+            <span v-else class="stat-number">{{ funcionariosFiltrados.length }}</span>
             <span class="stat-label">Filtrados</span>
           </div>
         </div>
@@ -137,7 +126,14 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="func in funcionariosFiltrados" :key="func.id">
+        <template v-if="isLoading && !funcionarios.length">
+          <tr v-for="i in 5" :key="i">
+            <td v-for="j in 12" :key="j">
+              <div class="skeleton-dark skeleton-text"></div>
+            </td>
+          </tr>
+        </template>
+        <tr v-else v-for="func in funcionariosPaginados" :key="func.id">
           <td class="col-nome" :class="['clicavel', celulasExpandidas.has('nome-' + func.id) ? 'expandida' : '']" @click="toggleCelula('nome-' + func.id)">
             {{ func.nome }}
           </td>
@@ -208,7 +204,21 @@
       <!-- Visualização em Cards -->
       <div v-else class="cards-view">
         <div class="cards-grid">
-          <div v-for="func in funcionariosFiltrados" :key="func.id" class="employee-card">
+          <template v-if="isLoading && !funcionarios.length">
+            <div v-for="i in 6" :key="i" class="employee-card">
+              <div class="card-header">
+                <div class="skeleton-dark skeleton-circle" style="width: 50px; height: 50px; flex-shrink: 0;"></div>
+                <div style="flex: 1; margin-left: 15px;">
+                  <div class="skeleton-dark skeleton-text" style="width: 70%"></div>
+                  <div class="skeleton-dark skeleton-text" style="width: 40%; height: 10px;"></div>
+                </div>
+              </div>
+              <div class="card-content">
+                <div class="skeleton-dark skeleton-text" v-for="j in 3" :key="j"></div>
+              </div>
+            </div>
+          </template>
+          <div v-else v-for="func in funcionariosPaginados" :key="func.id" class="employee-card">
             <div class="card-header">
               <div class="employee-avatar">
                 {{ (func.nome || 'U').charAt(0).toUpperCase() }}
@@ -287,12 +297,31 @@
       </div>
     </div>
 
+    <!-- Paginação -->
+    <div v-if="funcionariosFiltrados.length > itensPorPagina" class="pagination-footer">
+      <div class="pagination-info">
+        Mostrando {{ (paginaAtual - 1) * itensPorPagina + 1 }} - {{ Math.min(paginaAtual * itensPorPagina, funcionariosFiltrados.length) }} de {{ funcionariosFiltrados.length }}
+      </div>
+      <div class="pagination-buttons">
+        <button :disabled="paginaAtual === 1" @click="paginaAtual--" class="btn-page">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="page-number">Página {{ paginaAtual }} de {{ totalPaginas }}</span>
+        <button :disabled="paginaAtual === totalPaginas" @click="paginaAtual++" class="btn-page">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
     <!-- Modal usando Teleport para evitar problemas de overflow -->
     <Teleport to="body">
       <div v-if="showForm" class="modal-overlay" @click.self="fecharModal">
         <div class="form-modal">
         <h3>{{ editando ? 'Editar Funcionário' : 'Adicionar Funcionário' }}</h3>
         <form @submit.prevent="editando ? salvarEdicaoFuncionario() : cadastrarFuncionario()">
+          <div v-if="salvando" class="form-saving-overlay"></div>
+          <fieldset :disabled="salvando" style="border:none;padding:0;margin:0;">
           <!-- Bloco principal do formulário -->
           <div class="form-grid">
             <div>
@@ -454,14 +483,17 @@
             </div>
           </div>
           <div class="modal-actions">
-            <button type="submit" class="btn-cadastrar">Salvar</button>
-            <button type="button" @click="fecharModal">Cancelar</button>
+            <button type="submit" class="btn-cadastrar" :disabled="salvando">
+              <span v-if="salvando" class="btn-loading">⏳ Salvando...</span>
+              <span v-else>Salvar</span>
+            </button>
+            <button type="button" @click="fecharModal" :disabled="salvando">Cancelar</button>
           </div>
+          </fieldset>
         </form>
         </div>
       </div>
     </Teleport>
-  </div>
 </template>
 
 <script>
@@ -480,6 +512,7 @@ export default {
       showForm: false,
       editando: false,
       funcionarioEditId: null,
+      salvando: false,
       
       // Cache para otimização
       _cachedFiltro: '',
@@ -529,8 +562,20 @@ export default {
       novoGrupoWhatsappId: '',
       ordenacaoNome: 'asc',
       somenteAtivos: true, // filtro padrão ativado
+      
+      // Paginação
+      paginaAtual: 1,
+      itensPorPagina: 25,
     }
   },
+    
+    // Observadores para resetar página ao filtrar/buscar
+    watch: {
+      buscaFuncionario() { this.paginaAtual = 1; },
+      somenteAtivos() { this.paginaAtual = 1; },
+      itensPorPagina() { this.paginaAtual = 1; }
+    },
+    
   computed: {
     funcionariosAtivos() {
       return this.funcionarios.filter(f => !f.data_inativado);
@@ -591,6 +636,16 @@ export default {
       this._cachedResultado = lista;
       
       return lista;
+    },
+
+    totalPaginas() {
+      return Math.ceil(this.funcionariosFiltrados.length / this.itensPorPagina) || 1;
+    },
+
+    funcionariosPaginados() {
+      const inicio = (this.paginaAtual - 1) * this.itensPorPagina;
+      const fim = inicio + this.itensPorPagina;
+      return this.funcionariosFiltrados.slice(inicio, fim);
     },
     
     // Computadas otimizadas para selects
@@ -713,10 +768,12 @@ export default {
       } catch (error) {
         console.error(`Erro ao carregar ${tipo}:`, error);
       } finally {
-        this.loadingStates[loadingKey] = false;
-        if (tipo === 'funcionarios') {
-          this.isLoading = false;
-        }
+        setTimeout(() => {
+          this.loadingStates[loadingKey] = false;
+          if (tipo === 'funcionarios') {
+            this.isLoading = false;
+          }
+        }, 800);
       }
     },
 
@@ -838,6 +895,8 @@ export default {
       return grupo ? grupo.nome : 'Grupo não encontrado';
     },
     async cadastrarFuncionario() {
+      this.salvando = true;
+      try {
       let dataAdmissaoFormatada = '';
       if (this.form.data_admissao) {
         if (typeof this.form.data_admissao === 'string') {
@@ -866,12 +925,17 @@ export default {
         data_admissao: dataAdmissaoFormatada,
         data_inativado: ''
       });
-      await this.carregarFuncionarios();
       this.fecharModal();
+      this.carregarFuncionarios();
+      } catch (error) {
+        this.salvando = false;
+        alert('Erro ao cadastrar funcionário: ' + (error.response?.data?.detail || error.message));
+      }
     },
     fecharModal() {
       this.showForm = false;
       this.editando = false;
+      this.salvando = false;
       this.funcionarioEditId = null;
       this.form = {
         nome: '',
@@ -939,6 +1003,8 @@ export default {
       });
     },
     async salvarEdicaoFuncionario() {
+      this.salvando = true;
+      try {
       // Garante tipos corretos antes do envio
       let dataInativadoFormatada = '';
       if (this.form.data_inativado) {
@@ -994,8 +1060,12 @@ export default {
         data_admissao: dataAdmissaoFormatada,
         data_inativado: dataInativadoFormatada
       });
-      await this.carregarFuncionarios();
       this.fecharModal();
+      this.carregarFuncionarios();
+      } catch (error) {
+        this.salvando = false;
+        alert('Erro ao salvar funcionário: ' + (error.response?.data?.detail || error.message));
+      }
     },
     async excluirFuncionario(id) {
       if (confirm('Tem certeza que deseja excluir este funcionário?')) {
@@ -1132,114 +1202,76 @@ export default {
 }
 
 .header-premium {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   border-radius: 20px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    0 1px 2px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 40px rgba(59, 130, 246, 0.15), 
+              0 4px 16px rgba(59, 130, 246, 0.1);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.header-premium::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
-  gap: 2rem;
+  margin-bottom: 32px;
+  position: relative;
+  z-index: 1;
 }
 
-.header-left {
-  flex: 1;
-}
-
-.header-title h1 {
+.header-left .header-title h1 {
   margin: 0;
-  font-size: 2.2rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  color: #ffffff;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
+  gap: 16px;
+  line-height: 1.2;
 }
 
 .header-icon {
-  color: #ffffff;
-  font-size: 2rem;
+  font-size: 2.2rem;
+  opacity: 0.9;
 }
 
 .header-subtitle {
-  margin: 0;
-  color: #e0f2fe;
+  margin: 8px 0 0 0;
   font-size: 1.1rem;
+  opacity: 0.85;
   font-weight: 400;
 }
 
 .header-right {
-  flex: 2;
-  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
 }
 
 .controls-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-end;
 }
 
-.toggle-switch {
+.search-control {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: relative;
-  width: 48px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 24px;
-  transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-.slider::before {
-  content: '';
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  top: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.toggle-switch input:checked + .slider {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.toggle-switch input:checked + .slider::before {
-  transform: translateX(24px);
-}
-
-.toggle-text {
-  font-weight: 600;
-  color: #ffffff;
-  font-size: 0.9rem;
 }
 
 .search-wrapper {
@@ -1248,79 +1280,186 @@ export default {
   align-items: center;
 }
 
-.search-icon {
-  position: absolute;
-  left: 1rem;
-  color: #94a3b8;
-  z-index: 1;
+.search-input {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50px;
+  padding: 12px 20px 12px 48px;
+  color: white;
+  font-size: 14px;
+  width: 300px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
 }
 
-.search-input {
-  padding: 0.75rem 1rem 0.75rem 2.5rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 1rem;
-  background: white;
-  transition: all 0.3s ease;
-  width: 280px;
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  z-index: 1;
 }
 
 .clear-search {
   position: absolute;
-  right: 0.75rem;
+  right: 12px;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  padding: 0.25rem;
+  padding: 4px;
   border-radius: 50%;
   transition: all 0.2s ease;
 }
 
-.clear-search:hover {
-  color: #ef4444;
-  background: #fef2f2;
-}
-
 .action-buttons {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   align-items: center;
 }
 
-.view-toggle {
+.btn-action-premium {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-weight: 600;
   display: flex;
-  background: #f1f5f9;
-  border-radius: 10px;
-  padding: 4px;
-  gap: 2px;
-}
-
-.toggle-btn {
-  background: transparent;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
-  color: #64748b;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 1rem;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  font-size: 14px;
 }
 
-.toggle-btn.active {
+.btn-action-premium:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.luxe-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.luxe-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.luxe-slider {
+  position: relative;
+  width: 36px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  transition: 0.3s;
+}
+
+.luxe-slider::before {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 3px;
+  bottom: 3px;
   background: white;
-  color: #667eea;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  transition: 0.3s;
 }
 
-.toggle-btn:hover:not(.active) {
-  color: #475569;
+input:checked + .luxe-slider {
+  background: #10b981;
+}
+
+input:checked + .luxe-slider::before {
+  transform: translateX(18px);
+}
+
+.stats-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  flex-shrink: 0;
+}
+
+.stat-icon.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.stat-icon.inactive {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  font-weight: 500;
 }
 
 .content-area {
@@ -2045,6 +2184,7 @@ tbody tr:last-child td {
   width: calc(100% - 80px);
   max-height: calc(100vh - 80px);
   overflow-y: auto;
+  position: relative;
   box-shadow: 
     0 25px 50px -12px rgba(20,65,121,0.25),
     0 10px 25px rgba(20,65,121,0.1),
@@ -2080,6 +2220,20 @@ tbody tr:last-child td {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.form-saving-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: not-allowed;
+  z-index: 10;
+  border-radius: 8px;
+}
+
+fieldset:disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .form-modal button {
@@ -2360,6 +2514,92 @@ tbody tr:last-child td {
   
   .funcionarios-container {
     padding: 1.5rem;
+  }
+}
+
+/* --- ESTILOS DA PAGINAÇÃO --- */
+.pagination-control-mini {
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.page-size-select {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: white;
+  color: #3b82f6;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.page-size-select:hover {
+  background: #f1f5f9;
+}
+
+.pagination-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0 0 16px 16px;
+  margin-top: -1px;
+}
+
+.pagination-info {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.btn-page {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-page:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #3b82f6;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.btn-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-number {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  .pagination-footer {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
   }
 }
 </style>

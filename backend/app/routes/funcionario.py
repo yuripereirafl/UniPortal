@@ -19,8 +19,10 @@ from ..schemas.grupo_email import GrupoEmailOut
 from ..schemas.grupo_pasta import GrupoPastaOut
 from ..schemas.grupo_whatsapp import GrupoWhatsapp as GrupoWhatsappOut
 from ..database import engine
-from app.models.meta import Meta
-from app.models.funcionario_meta import FuncionarioMeta
+# REMOVIDO: Meta - funcionalidade de metas desabilitada
+# from app.models.meta import Meta
+# REMOVIDO: FuncionarioMeta - funcionalidade de metas desabilitada
+# from app.models.funcionario_meta import FuncionarioMeta
 
 def converter_string_para_date(data_str):
     """Converte string de data para objeto date"""
@@ -426,49 +428,86 @@ def atualizar_funcionario(id: int, funcionario: FuncionarioUpdate):
     db.close()
     return funcionario_schema
 
-@router.get('/funcionarios/', response_model=list[FuncionarioSchema])
+from pydantic import BaseModel
+
+class FuncionarioSimples(BaseModel):
+    id: int
+    nome: str
+    sobrenome: str
+    class Config:
+        from_attributes = True
+
+@router.get('/funcionarios/dropdown', response_model=list[FuncionarioSimples])
+def list_funcionarios_dropdown():
+    db = SessionLocal()
+    try:
+        funcionarios = db.query(FuncionarioModel.id, FuncionarioModel.nome, FuncionarioModel.sobrenome).all()
+        return [{"id": f.id, "nome": f.nome, "sobrenome": f.sobrenome} for f in funcionarios]
+    finally:
+        db.close()
+
+@router.get('/funcionarios/')
 def list_funcionarios():
     db = SessionLocal()
-    from sqlalchemy.orm import joinedload
+    from sqlalchemy.orm import selectinload
     funcionarios = db.query(FuncionarioModel).options(
-        joinedload(FuncionarioModel.setores),
-        joinedload(FuncionarioModel.sistemas),
-        joinedload(FuncionarioModel.grupos_email),
-        joinedload(FuncionarioModel.grupos_pasta),
-        joinedload(FuncionarioModel.grupos_whatsapp),
-        joinedload(FuncionarioModel.cargos_vinculos).joinedload(FuncionarioCargo.cargo)
+        selectinload(FuncionarioModel.setores),
+        selectinload(FuncionarioModel.sistemas),
+        selectinload(FuncionarioModel.grupos_email),
+        selectinload(FuncionarioModel.grupos_pasta),
+        selectinload(FuncionarioModel.grupos_whatsapp),
+        selectinload(FuncionarioModel.cargos_vinculos).joinedload(FuncionarioCargo.cargo)
     ).all()
+    
     resultado = []
+
     for funcionario in funcionarios:
-        setores = [SetorOut.from_orm(setor) for setor in funcionario.setores]
-        sistemas = [SistemaSchema.from_orm(sistema) for sistema in funcionario.sistemas]
-        grupos_email = [GrupoEmailOut.from_orm(grupo) for grupo in funcionario.grupos_email]
-        grupos_pasta = [GrupoPastaOut.from_orm(grupo) for grupo in funcionario.grupos_pasta]
-        grupos_whatsapp = [GrupoWhatsappOut.from_orm(grupo) for grupo in funcionario.grupos_whatsapp]
-        cargo_obj = None
-        if hasattr(funcionario, 'cargos_vinculos') and funcionario.cargos_vinculos:
+        setores = [{"id": s.id, "nome": s.nome, "descricao": s.descricao} for s in funcionario.setores]
+        sistemas = [{"id": s.id, "nome": s.nome, "descricao": getattr(s, 'descricao', None), "status": getattr(s, 'status', 'Ativo')} for s in funcionario.sistemas]
+        grupos_email = [{"id": g.id, "nome": g.nome, "descricao": getattr(g, 'descricao', None)} for g in funcionario.grupos_email]
+        grupos_pasta = [{"id": g.id, "nome": g.nome, "descricao": getattr(g, 'descricao', None)} for g in funcionario.grupos_pasta]
+        grupos_whatsapp = [{"id": g.id, "nome": getattr(g, 'nome', ''), "descricao": getattr(g, 'descricao', None)} for g in funcionario.grupos_whatsapp]
+        
+        cargo_dict = None
+        if funcionario.cargos_vinculos:
             vinculos_ativos = [v for v in funcionario.cargos_vinculos if v.dt_fim is None]
             chosen = vinculos_ativos[0] if vinculos_ativos else max(funcionario.cargos_vinculos, key=lambda v: v.dt_inicio or date.min)
-            cargo_obj = chosen.cargo if chosen and chosen.cargo else None
-        funcionario_schema = FuncionarioSchema.model_validate({
-            **funcionario.__dict__,
-            'setores': setores,
-            'sistemas': sistemas,
-            'grupos_email': grupos_email,
-            'grupos_pasta': grupos_pasta,
-            'grupos_whatsapp': grupos_whatsapp,
-            'cargo': __import__('app.schemas.cargo', fromlist=['CargoOut']).CargoOut.from_orm(cargo_obj) if cargo_obj else None,
-            'data_admissao': str(funcionario.data_admissao) if funcionario.data_admissao not in (None, '') else '',
-            'data_inativado': str(funcionario.data_inativado) if funcionario.data_inativado is not None else '',
-            'cpf': funcionario.cpf,
-            'data_afastamento': funcionario.data_afastamento.strftime('%Y-%m-%d') if funcionario.data_afastamento else None,
-            'tipo_contrato': funcionario.tipo_contrato,
-            'data_retorno': funcionario.data_retorno.strftime('%Y-%m-%d') if funcionario.data_retorno else None,
-            'motivo_afastamento': funcionario.motivo_afastamento,
-            'lider_direto_id': funcionario.lider_direto_id,
-            'id_eyal': funcionario.id_eyal
+            if chosen and chosen.cargo:
+                c = chosen.cargo
+                cargo_dict = {
+                    "id": c.id, "nome": c.nome, "nivel": getattr(c, 'nivel', None),
+                    "funcao": getattr(c, 'funcao', None), "equipe": getattr(c, 'equipe', None)
+                }
+
+        resultado.append({
+            "id": funcionario.id,
+            "nome": funcionario.nome,
+            "sobrenome": funcionario.sobrenome,
+            "celular": getattr(funcionario, 'celular', None),
+            "email": getattr(funcionario, 'email', None),
+            "equipe": getattr(funcionario, 'equipe', None),
+            "cpf": funcionario.cpf,
+            "tipo_contrato": funcionario.tipo_contrato,
+            "lider_direto_id": funcionario.lider_direto_id,
+            "id_eyal": funcionario.id_eyal,
+            "setores_ids": [s["id"] for s in setores],
+            "sistemas_ids": [s["id"] for s in sistemas],
+            "grupos_email_ids": [g["id"] for g in grupos_email],
+            "grupos_pasta_ids": [g["id"] for g in grupos_pasta],
+            "grupos_whatsapp_ids": [g["id"] for g in grupos_whatsapp],
+            "setores": setores,
+            "sistemas": sistemas,
+            "grupos_email": grupos_email,
+            "grupos_pasta": grupos_pasta,
+            "grupos_whatsapp": grupos_whatsapp,
+            "cargo": cargo_dict,
+            "data_admissao": str(funcionario.data_admissao) if funcionario.data_admissao not in (None, '') else '',
+            "data_inativado": str(funcionario.data_inativado) if funcionario.data_inativado is not None else '',
+            "data_afastamento": str(funcionario.data_afastamento) if funcionario.data_afastamento else None,
+            "data_retorno": str(funcionario.data_retorno) if funcionario.data_retorno else None,
+            "motivo_afastamento": funcionario.motivo_afastamento,
         })
-        resultado.append(funcionario_schema)
+        
     db.close()
     return resultado
 

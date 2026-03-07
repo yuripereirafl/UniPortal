@@ -66,7 +66,7 @@ DB_USER=$db_user
 DB_PASSWORD=$db_pass
 API_URL=http://$ip_server:8000
 VUE_APP_API_URL=http://$ip_server:8000
-COMPOSE_PROJECT_NAME=system-ti
+COMPOSE_PROJECT_NAME=uniportal-main-fresh
 EOF
 
         # Atualizar frontend .env também

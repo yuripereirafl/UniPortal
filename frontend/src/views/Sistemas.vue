@@ -99,7 +99,26 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="sistema in sistemasFiltrados" :key="sistema.id" class="table-row">
+            <template v-if="!sistemas.length && loading">
+              <tr v-for="i in 5" :key="i" class="table-row">
+                <td class="name-cell">
+                  <div class="name-content">
+                    <div class="skeleton-dark skeleton-circle" style="width: 40px; height: 40px; flex-shrink: 0;"></div>
+                    <div class="skeleton-dark skeleton-text" style="width: 120px;"></div>
+                  </div>
+                </td>
+                <td class="description-cell">
+                  <div class="skeleton-dark skeleton-text" style="width: 200px;"></div>
+                </td>
+                <td class="status-cell">
+                  <div class="skeleton-dark skeleton-text" style="width: 80px; margin: 0 auto; height: 24px; border-radius: 20px;"></div>
+                </td>
+                <td class="actions-cell">
+                  <div class="skeleton-dark skeleton-text" style="width: 80px; margin: 0 auto;"></div>
+                </td>
+              </tr>
+            </template>
+            <tr v-else v-for="sistema in sistemasFiltrados" :key="sistema.id" class="table-row">
               <td class="name-cell">
                 <div class="name-content">
                   <div class="sistema-icon">
@@ -169,7 +188,8 @@ export default {
         nome: '',
         descricao: '',
         status: ''
-      }
+      },
+      loading: true
     }
   },
   computed: {
@@ -210,11 +230,16 @@ export default {
       this.ordenacaoNome = this.ordenacaoNome === 'asc' ? 'desc' : 'asc';
     },
     async carregarSistemas() {
+      this.loading = true;
       try {
         const response = await axios.get(`${API_BASE_URL}/sistemas`);
         this.sistemas = response.data;
       } catch (error) {
         console.error('Erro ao carregar sistemas:', error);
+      } finally {
+        setTimeout(() => {
+          this.loading = false;
+        }, 600);
       }
     },
     async cadastrarSistema() {

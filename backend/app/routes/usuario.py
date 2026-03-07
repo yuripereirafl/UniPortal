@@ -18,6 +18,7 @@ router = APIRouter()
 # Endpoint para listar todos os usuários (com setores carregados)
 @router.get('/usuarios/')
 def listar_usuarios(db: Session = Depends(get_db)):
+    # Otimizado para trazer setores em uma única query
     usuarios = db.query(UsuarioModel).options(selectinload(UsuarioModel.setores)).all()
     print("[DEBUG] Usuários carregados:")
     for u in usuarios:
@@ -60,10 +61,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15  # 15 minutos
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 Horas (evita relogando toda hora)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+# O tokenUrl deve ser relativo ou absoluto conforme a rota de registro.
+# Se o router for registrado em app.include_router(usuario_router), e não tiver prefixo:
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login") 
 
 class Token(BaseModel):
     access_token: str
@@ -73,33 +77,34 @@ class TokenData(BaseModel):
     username: str | None = None
 
 def verify_password(plain_password, hashed_password):
-    """Verifica a senha com suporte a formatos legados.
-
-    Retorna uma tupla (is_valid: bool, needs_rehash: bool).
-    needs_rehash é True quando o hash era legível por fallback (MD5/SHA1/texto)
-    e deveria ser atualizado para o esquema atual do pwd_context.
-    """
+    """Verifica a senha com suporte a formatos legados."""
+    if not hashed_password or not plain_password:
+        return False, False
+        
     try:
+        # Tenta o esquema padrão do pwd_context (bcrypt)
         valid = pwd_context.verify(plain_password, hashed_password)
-        # se for válido, verificar se o hash precisa de atualização (parâmetros antigos)
         try:
             needs = pwd_context.needs_update(hashed_password)
         except Exception:
             needs = False
         return valid, bool(needs)
-    except UnknownHashError:
-        # tenta MD5 (32 hex)
+    except Exception as e:
+        print(f"[AUTH ERROR] Erro na verificação do hash principal: {str(e)}")
+        
+        # Fallback para MD5 (32 hex)
         try:
             if hashed_password and len(hashed_password) == 32 and all(c in string.hexdigits for c in hashed_password):
-                matched = hashlib.md5(plain_password.encode()).hexdigest() == hashed_password.lower()
-                return matched, matched
-            # tenta SHA1 (40 hex)
+                matched = hashlib.md5(plain_password.encode()).hexdigest().lower() == hashed_password.lower()
+                if matched: return True, True
+            # Tenta SHA1 (40 hex)
             if hashed_password and len(hashed_password) == 40 and all(c in string.hexdigits for c in hashed_password):
-                matched = hashlib.sha1(plain_password.encode()).hexdigest() == hashed_password.lower()
-                return matched, matched
-        except Exception:
-            pass
-        # como último recurso, compara texto puro (apenas para migração/dev)
+                matched = hashlib.sha1(plain_password.encode()).hexdigest().lower() == hashed_password.lower()
+                if matched: return True, True
+        except Exception as ex:
+            print(f"[AUTH ERROR] Erro no fallback de hash: {str(ex)}")
+
+        # Como último recurso, compara texto puro (apenas para migração)
         matched = plain_password == hashed_password
         return matched, matched
 
@@ -116,13 +121,21 @@ def get_user(db, username: str):
     return db.query(UsuarioModel).filter(UsuarioModel.username == username).first()
 
 def authenticate_user(db, username: str, password: str):
-    user = get_user(db, username)
-    if not user:
-        return None, False
-    is_valid, needs_rehash = verify_password(password, user.hashed_password)
-    if not is_valid:
-        return None, False
-    return user, needs_rehash
+    try:
+        user = get_user(db, username)
+        if not user:
+            print(f"[AUTH] Usuário não encontrado: {username}")
+            return None, False
+        is_valid, needs_rehash = verify_password(password, user.hashed_password)
+        if not is_valid:
+            print(f"[AUTH] Senha inválida para: {username}")
+            return None, False
+        return user, needs_rehash
+    except Exception as e:
+        print(f"[AUTH ERROR CRITICAL] Falha durante autenticação: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise e
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     db = SessionLocal()
@@ -345,18 +358,34 @@ def atualizar_permissoes_usuario(id: int, payload: dict = Body(...)):
 @router.post('/login', response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     db = SessionLocal()
-    user, needs_rehash = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
+    try:
+        print(f"[LOGIN] Tentativa de acesso: {form_data.username}")
+        user, needs_rehash = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            db.close()
+            print(f"[LOGIN] Falha: usuário ou senha incorreto para {form_data.username}")
+            raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
+        
+        # Se senha veio de formato legado, re-hash e atualiza no banco
+        if needs_rehash:
+            try:
+                user.hashed_password = get_password_hash(form_data.password)
+                db.add(user)
+                db.commit()
+                print(f"[LOGIN] Hash atualizado para o usuário {form_data.username}")
+            except Exception as e:
+                db.rollback()
+                print(f"[LOGIN] Erro ao atualizar hash: {str(e)}")
+        
+        access_token = create_access_token(data={"sub": user.username}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+        print(f"[LOGIN] Sucesso para: {form_data.username}")
+        return {"access_token": access_token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[LOGIN ERROR] Erro interno: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Erro interno no servidor de autenticação")
+    finally:
         db.close()
-        raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
-    # Se senha veio de formato legado, re-hash e atualiza no banco
-    if needs_rehash:
-        try:
-            user.hashed_password = get_password_hash(form_data.password)
-            db.add(user)
-            db.commit()
-        except Exception:
-            db.rollback()
-    access_token = create_access_token(data={"sub": user.username}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    db.close()
-    return {"access_token": access_token, "token_type": "bearer"}

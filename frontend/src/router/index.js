@@ -52,19 +52,24 @@ axios.interceptors.response.use(
 
     // Se for erro 401 (token expirado/inválido), redirecionar para login
     if (error.response && error.response.status === 401) {
-      // Evitar múltiplos redirecionamentos simultâneos
       if (!isRedirecting) {
         isRedirecting = true;
-        console.warn('Sessão expirada (401). Redirecionando para login...');
 
-        // Limpar dados de autenticação
-        localStorage.removeItem('token');
-        localStorage.removeItem('current_user');
+        // Redirecionar para login apenas se NÃO for uma tentativa de login falha
+        const urlString = error.config && error.config.url ? String(error.config.url) : '';
+        const isLoginRequest = urlString === '/login' || urlString.endsWith('/login');
 
-        // Redirecionar para login após um pequeno delay
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
+        if (!isLoginRequest) {
+          console.warn('Sessão expirada (401). Redirecionando para login...');
+          localStorage.removeItem('token');
+          localStorage.removeItem('current_user');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        } else {
+          // Se for erro no login, permitir que o usuário veja a mensagem de "usuário ou senha inválidos"
+          isRedirecting = false;
+        }
       }
     }
     return Promise.reject(error);

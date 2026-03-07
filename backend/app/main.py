@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
@@ -13,8 +14,12 @@ from app.models.grupo_email import GrupoEmail
 from app.models.grupos import Grupo
 from app.models.permissao import Permissao
 
-# --- IMPORTAÇÃO DE TODOS OS ROUTERS ---
-# (Mantendo os seus routers existentes)
+# =============================================================================
+# ROUTERS ATIVOS - FUNCIONALIDADES MANTIDAS
+# =============================================================================
+# (Removidos: quadro_colaboradores, metas, colaborador_resumo, metas_unidades, etc.)
+
+# Routers principais (mantidos)
 from app.routes.funcionario import router as funcionario_router
 from app.routes.sistema import router as sistema_router
 from app.routes.setores import router as setores_router
@@ -24,39 +29,27 @@ from app.routes.grupo_whatsapp import router as grupo_whatsapp_router
 from app.routes.funcionario_cargo import router as funcionario_cargo_router
 from app.routes.cargo import router as cargo_router
 from app.routes.cargo_opcoes import router as cargo_opcoes_router
-from app.routes.quadro_colaboradores import router as quadro_colaboradores_router
 from app.routes.usuario import router as usuario_router
 from app.routes.relatorios import router as relatorios_router
 from app.routes.permissoes import router as permissoes_router
+from app.routes.celular import router as celular_router
 
-# --- NOVAS ROTAS (IMPORTADAS CORRETAMENTE) ---
-from app.routes.metas import router as metas_router
-from app.routes.realizado import router as realizado_router
-from app.routes.performance import router as performance_router # NOVO 
-from app.routes.metas_unidades import router as metas_unidades_router
-from app.routes.metas_unidades_real import router as metas_unidades_real_router 
-from app.routes.ranking import router as ranking_router
-from app.routes.vendas import router as vendas_router 
-from app.routes.nps import router as nps_router  # ✅ NOVO: NPS/CSAT
-from app.routes.orcamentos import router as orcamentos_router  # ✅ NOVO: Orçamentos
-from app.routes.comissao import router as comissao_router  # ✅ NOVO: Comissões
-from app.routes.colaborador_resumo import router as colaborador_resumo_router  # ✅ Novo: resumo rápido colaborador
-from app.routes.unidade_resumo import router as unidade_resumo_router  # ✅ NOVO: Resumo rápido unidade
-from app.routes.pagamentos import router as pagamentos_router  # ✅ NOVO: Pagamentos de Meta
+# REMOVIDO: módulos de vendas/metas/performance (realizado, performance, ranking,
+# vendas, nps, orcamentos, comissao, unidade_resumo, pagamentos, resumo_colaborador_email)
 
 # --- INICIALIZAÇÃO DA APLICAÇÃO ---
 app = FastAPI(
     title="UniPortal API",
-    description="API para gestão de colaboradores, acessos e metas.",
-    version="1.0.0"
+    description="API para gestão de colaboradores, sistemas e acessos. Versão simplificada sem módulo de metas.",
+    version="2.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
     # Permitir origin específica do frontend na VM e manter regex para outros ambientes locais
     allow_origins=[
-        "http://192.168.1.37:8080",  # Frontend na VMware
-        "http://192.168.1.202:8080",
+        "http://192.168.1.202:8080",  # Frontend na VMware
+        "http://192.168.1.11:8080",   # IP local desta máquina
         "http://localhost:8080",
         "http://127.0.0.1:8080"
     ],
@@ -64,10 +57,17 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=600, # Cache do Preflight (OPTIONS) por 10 minutos para reduzir latência
 )
 
-# --- INCLUSÃO DE TODOS OS ROUTERS NA APLICAÇÃO ---
-# (Mantendo os seus routers existentes)
+# Ativa compressão GZip para respostas maiores que 1KB (excelente para listagens grandes)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# =============================================================================
+# REGISTRO DOS ROUTERS ATIVOS
+# =============================================================================
+
+# Routers principais (core do sistema)
 app.include_router(funcionario_router)
 app.include_router(sistema_router)
 app.include_router(setores_router)
@@ -77,25 +77,12 @@ app.include_router(grupo_whatsapp_router)
 app.include_router(funcionario_cargo_router)
 app.include_router(cargo_router)
 app.include_router(cargo_opcoes_router)
-app.include_router(quadro_colaboradores_router)
 app.include_router(usuario_router)
 app.include_router(relatorios_router)
 app.include_router(permissoes_router)
+app.include_router(celular_router)
 
-# --- REGISTO DAS NOVAS ROTAS ---
-app.include_router(metas_router)
-app.include_router(realizado_router)
-app.include_router(performance_router) # NOVO
-app.include_router(metas_unidades_router, prefix="/metas-unidades", tags=["Metas das Unidades"])
-app.include_router(metas_unidades_real_router, prefix="/metas-unidades-real", tags=["Dashboard Unidades Real"])
-app.include_router(ranking_router, prefix="/ranking", tags=["Ranking de Vendedores"])
-app.include_router(vendas_router)  # ✅ Vendas da basecampanhas
-app.include_router(nps_router)  # ✅ NOVO: NPS/CSAT
-app.include_router(orcamentos_router)  # ✅ NOVO: Orçamentos
-app.include_router(comissao_router)  # ✅ NOVO: Comissões
-app.include_router(colaborador_resumo_router)  # ✅ Registrar rota: /realizado/colaborador/resumo-rapido
-app.include_router(unidade_resumo_router)  # ✅ NOVO: Resumo rápido unidade - /realizado/unidade/resumo-rapido
-app.include_router(pagamentos_router)  # ✅ NOVO: Pagamentos de Meta
+# REMOVIDO: routers de vendas/metas/performance
 
 # --- OS SEUS ENDPOINTS DE DASHBOARD (MANTIDOS INTACTOS) ---
 @app.get("/dashboard/totais")

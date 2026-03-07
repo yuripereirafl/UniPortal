@@ -1,0 +1,7 @@
+# Arquivos temporários da pasta config
+*.pyc
+__pycache__/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

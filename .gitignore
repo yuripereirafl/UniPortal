@@ -30,3 +30,4 @@ db.sqlite3
 # Dumps e scripts de banco
 *.dump
 *.sql
+*.md

@@ -1,219 +1,220 @@
-<<<<<<< HEAD
-# Sistema TI - Controle de Gestão da TI
+# UniPortal - Sistema de Gestão Organizacional
 
-Sistema de gestão para controle de funcionários, sistemas, setores e grupos de email da área de TI.
+> **Versão 2.0** - Sistema simplificado e otimizado para gestão empresarial
 
-## 📋 Pré-requisitos
+## 🎯 **Sobre o Sistema**
 
-Antes de iniciar, certifique-se de ter instalado:
+O **UniPortal** é uma plataforma integrada para gestão de colaboradores, controle de acessos e análise de desempenho organizacional. Esta versão foi completamente limpa e reorganizada para máxima eficiência.
 
-- **Python 3.8+** (recomendado Python 3.9 ou superior)
-- **Node.js 14+** e **npm**
-- **Git** (opcional, para controle de versão)
+## ⚡ **Características Principais**
 
+- 🏢 **Gestão Completa de Colaboradores** - Cadastro, edição e controle
+- 🔐 **Sistema de Permissões Avançado** - Controle granular de acessos 
+- 📊 **Dashboard Analítico** - Métricas e indicadores em tempo real
+- 💼 **Gestão de Sistemas e Grupos** - Organização por departamentos
+- 📈 **Relatórios e Performance** - Análises detalhadas de produtividade
+- 🚀 **Deploy Simplificado** - Configuração automática por ambiente
 
-## 🚀 Como executar o projeto no Linux
+## 🏗️ **Arquitetura**
 
-### 1. Clonando o projeto
+```
+UniPortal/
+├── 📁 backend/          # API FastAPI + PostgreSQL
+├── 📁 frontend/         # Interface Vue.js 3
+├── 📁 config/           # Configurações centralizadas  
+├── 📁 scripts/          # Scripts de manutenção e análise
+├── 📁 _removed_components/ # Componentes desabilitados
+├── 🐳 docker-compose.yml   # Deploy containerizado
+└── 📄 .env                 # Configuração única
+```
 
+### **Stack Tecnológica:**
+- **Backend:** FastAPI + SQLAlchemy + PostgreSQL
+- **Frontend:** Vue.js 3 + Composition API + Axios  
+- **Deploy:** Docker + Docker Compose
+- **Banco:** PostgreSQL (servidor externo)
+
+## 🚀 **Quick Start**
+
+### **1. Configuração**
 ```bash
-git clone https://github.com/yuripereirafl/System_ti-main.git
-cd System_ti-main
+# Clonar e configurar
+git clone [repo]
+cd UniPortal-Portal_atual
+
+# Configurar ambiente
+cp .env.example .env
+# Editar .env com suas configurações
 ```
 
-### 2. Configuração do Backend (FastAPI)
-
+### **2. Execução com Docker (Recomendado)**
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt --break-system-packages
-nohup venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > backend.log 2>&1 &
+# Subir toda a aplicação
+docker-compose up -d
+
+# Acessar:
+# Frontend: http://192.168.1.37:8080
+# Backend: http://192.168.1.37:8000
 ```
 
-### 3. Configuração do Frontend (Vue.js)
-
+### **3. Desenvolvimento Local**
 ```bash
-cd ../frontend
-echo "VUE_APP_API_URL=http://192.168.1.37:8000" > .env
-npm install
-nohup npm run serve > frontend.log 2>&1 &
-```
-
-### 4. Acessando o sistema
-
-Acesse pelo navegador:
-```
-http://192.168.1.37:8080
-```
-
-### 5. Logs e diagnóstico
-
-Para ver os logs do backend:
-```bash
-tail -n 50 ../backend/backend.log
-```
-Para ver os logs do frontend:
-```bash
-tail -n 50 frontend.log
-```
-
-   > ⚠️ **Importante**: Use o IP da sua rede local. Para descobrir seu IP:
-   > ```powershell
-   > ipconfig
-   > ```
-   > Procure por "Endereço IPv4" na seção do seu adaptador de rede.
-
-4. **Verifique se está funcionando:**
-   - Acesse: `http://192.168.1.151:8000/docs` (documentação da API)
-   - Deve mostrar a interface do Swagger com todas as rotas disponíveis
-
-### 3. Configuração do Frontend (Vue.js)
-
-1. **Abra um NOVO terminal PowerShell** (mantenha o backend rodando no primeiro)
-2. **Navegue para a pasta do frontend:**
-   ```powershell
-   cd c:\Users\yuri.flores\Desktop\System_ti\frontend
-   ```
-
-3. **Instale as dependências do Node.js** (se ainda não instalou):
-   ```powershell
-   npm install
-   ```
-
-4. **Inicie o servidor de desenvolvimento:**
-   ```powershell
-   npm run serve
-   ```
-
-5. **Aguarde a compilação** e acesse:
-   - Local: `http://localhost:8080`
-   - Rede: `http://192.168.1.151:8080`
-
-## 🔧 Estrutura do Projeto
-
-```
-System_ti/
-├── backend/                 # API FastAPI
-│   ├── app/
-│   │   ├── main.py         # Arquivo principal da API
-│   │   ├── models/         # Modelos do banco de dados
-│   │   ├── routes/         # Rotas da API
-│   │   └── database.py     # Configuração do banco
-│   └── requirements.txt    # Dependências Python
-├── frontend/               # Interface Vue.js
-│   ├── src/
-│   │   ├── views/          # Páginas da aplicação
-│   │   ├── components/     # Componentes reutilizáveis
-│   │   └── assets/         # Imagens e recursos
-│   ├── package.json        # Dependências Node.js
-│   └── public/             # Arquivos públicos
-└── README.md              # Este arquivo
-```
-
-## 🌐 URLs importantes
-
-- **Frontend**: http://localhost:8080 ou http://192.168.1.151:8080
-- **Backend API**: http://192.168.1.151:8000
-- **Documentação da API**: http://192.168.1.151:8000/docs
-- **Banco de dados**: SQLite (arquivo local)
-
-## 💡 Funcionalidades
-
-- ✅ **Dashboard Analítico**: Visão geral com métricas e indicadores
-- ✅ **Gestão de Funcionários**: CRUD completo com filtros de busca
-- ✅ **Gestão de Sistemas**: Controle de sistemas de TI com analytics
-- ✅ **Gestão de Setores**: Organização departamental
-- ✅ **Grupos de Email**: Controle de listas de distribuição
-- ✅ **Filtros de Busca**: Em todas as tabelas do sistema
-- ✅ **Interface Responsiva**: Design profissional e moderno
-
-## 🔍 Solução de Problemas
-
-### Erro "Falha ao carregar dados"
-- Verifique se o backend está rodando em `192.168.1.151:8000`
-- Confirme se não há firewall bloqueando as portas 8000 e 8080
-- Verifique se o IP configurado está correto
-
-### Erro de CORS
-- O backend já está configurado para aceitar requisições de qualquer origem
-- Se persistir, verifique a configuração em `backend/app/main.py`
-
-### Porta em uso
-- Se a porta 8000 ou 8080 já estiver em uso, mude para outra porta:
-  ```powershell
-  # Backend em porta diferente
-  python -m uvicorn app.main:app --reload --host 192.168.1.151 --port 8001
-  
-  # Frontend em porta diferente
-  npm run serve -- --port 8081
-  ```
-
-## 📦 Scripts úteis
-
-### Para parar os serviços:
-```powershell
-# No terminal onde está rodando, pressione Ctrl+C
-# Ou force o término:
-taskkill /F /IM python.exe
-taskkill /F /IM node.exe
-```
-
-### Para rebuild completo:
-```powershell
-# Frontend
-cd frontend
-npm install
-npm run build
-
 # Backend
 cd backend
-pip install -r requirements.txt
-```
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-## 🛠️ Desenvolvimento
-
-### Banco de Dados
-- O sistema usa SQLite, banco local criado automaticamente
-- Arquivo do banco: `backend/database.db`
-- Para reset completo: delete o arquivo `database.db` e reinicie o backend
-
-### Estrutura da API
-- **Funcionários**: `/funcionarios/`
-- **Sistemas**: `/sistemas/`
-- **Setores**: `/setores/`
-- **Grupos Email**: `/grupos-email/`
-- **Analytics**: `/sistemas/analytics/`
-
-### Hot Reload
-- **Backend**: Salve qualquer arquivo Python e a API recarrega automaticamente
-- **Frontend**: Salve qualquer arquivo Vue e a página atualiza automaticamente
-
-## 📝 Comandos de Início Rápido
-
-**Terminal 1 (Backend):**
-```powershell
-cd c:\Users\yuri.flores\Desktop\System_ti\backend
-python -m uvicorn app.main:app --reload --host 192.168.1.151 --port 8000
-```
-
-**Terminal 2 (Frontend):**
-```powershell
-cd c:\Users\yuri.flores\Desktop\System_ti\frontend
+# Frontend (terminal separado)
+cd frontend  
+npm install
 npm run serve
 ```
 
+## 📋 **Funcionalidades Disponíveis**
+
+### ✅ **Módulos Ativos**
+- **👥 Funcionários** - CRUD completo com hierarquia
+- **🔧 Sistemas** - Gestão de softwares e acessos
+- **🏢 Setores** - Organização departamental
+- **📧 Grupos de Email** - Listas de distribuição
+- **📁 Grupos de Pasta** - Controle de diretórios compartilhados
+- **💬 Grupos WhatsApp** - Gestão de comunicação
+- **👤 Usuários** - Autenticação e permissões
+- **💼 Cargos** - Hierarquia organizacional
+- **📊 Dashboard** - Métricas e KPIs em tempo real
+- **📈 Performance** - Análise de produtividade
+- **🏆 Ranking** - Classificação por desempenho
+- **💰 Vendas** - Dados comerciais
+- **⭐ NPS/CSAT** - Indicadores de satisfação
+- **💵 Orçamentos** - Controle financeiro
+- **💎 Comissões** - Cálculo de remuneração variável
+
+### ❌ **Módulos Desabilitados**
+- ~~Quadro de Colaboradores~~ (funcionalidade removida)
+- ~~Meta de Colaboradores~~ (sistema simplificado)
+- ~~Meta de Unidades~~ (foco em outros indicadores)
+
+## 🔧 **Configuração**
+
+O sistema utiliza **configuração centralizada** através do arquivo [`config/settings.py`](config/settings.py):
+
+### **Por Ambiente:**
+```python
+# Development
+ENVIRONMENT=development
+DB_HOST=192.168.1.37  # Sempre servidor externo
+
+# Production  
+ENVIRONMENT=production
+DB_HOST=192.168.1.37  # Servidor otimizado
+
+# Testing
+ENVIRONMENT=testing
+DB_HOST=192.168.1.37  # Base de testes isolada
+```
+
+### **Variáveis Principais:**
+```bash
+# Banco de Dados (SEMPRE externo)
+DB_HOST=192.168.1.37
+DB_PORT=5432
+DB_USER=dadosrh
+DB_PASSWORD=dadosrh
+DB_NAME=dadosrh
+
+# Aplicação
+BACKEND_PORT=8000
+FRONTEND_PORT=8080
+SECRET_KEY=sua-chave-secreta
+
+# Docker
+COMPOSE_PROJECT_NAME=uniportal
+```
+
+## 🛠️ **Scripts Utilitários**
+
+O sistema inclui scripts organizados para manutenção:
+
+```bash
+# Análise de dados
+cd scripts/analysis
+python verificar_meses.py
+python analise_vendas_filial.py
+
+# Manutenção do sistema
+cd scripts/maintenance  
+python check_user_permissions.py
+python grant_admin_to_user.py
+```
+
+## 📊 **Dashboard e Métricas**
+
+### **Indicadores Principais:**
+- 👥 **Total de Funcionários** por setor e sistema
+- 📧 **Grupos Ativos** (email, pasta, WhatsApp)
+- 📈 **Performance Geral** da organização
+- 🏆 **Rankings** de desempenho
+- 💰 **Dados Comerciais** e financeiros
+- ⭐ **Índices de Satisfação** (NPS/CSAT)
+
+### **Relatórios Disponíveis:**
+- Distribuição por departamentos
+- Análise de produtividade
+- Histórico de performance
+- Métricas de engajamento
+- Controle de comissões
+
+## 🔒 **Sistema de Permissões**
+
+Controle granular por perfil de usuário:
+
+- **👑 ADM** - Acesso total ao sistema
+- **👤 Gerente** - Gestão de equipe e relatórios
+- **📊 Analista** - Visualização de dados e métricas  
+- **👥 Colaborador** - Acesso limitado às próprias informações
+- **🔧 Técnico** - Manutenção de sistemas específicos
+
+## 🔄 **Atualizações e Manutenção**
+
+### **Deploy de Atualizações:**
+```bash
+# Pull das mudanças
+git pull origin main
+
+# Rebuild dos containers
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### **Backup e Restore:**
+```bash
+# Scripts de backup automático (incluídos)
+cd scripts/maintenance
+python backup_database.py
+```
+
+## 📞 **Suporte**
+
+- **Documentação:** Veja as pastas `config/README.md` e `scripts/README.md`
+- **Logs:** `docker-compose logs -f [backend|frontend]`
+- **Debug:** Execute `python backend/utils/config_helper.py`
+
+## 📄 **Changelog**
+
+### **v2.0.0** (Março 2026) - Limpeza Completa ✨
+- ✅ Removido banco local do Docker
+- ✅ Desabilitado módulo de metas individuais  
+- ✅ Sistema simplificado e otimizado
+- ✅ Configuração centralizada
+- ✅ Interface mais clean e objetiva
+
+### **v1.0.0** - Versão Inicial
+- Sistema completo com todos os módulos
+
 ---
 
-## 👥 Suporte
+## 🎉 **Sistema Pronto para Produção!**
 
-Em caso de dúvidas ou problemas:
-1. Verifique se todos os pré-requisitos estão instalados
-2. Confirme se as portas 8000 e 8080 estão livres
-3. Verifique se o IP da rede está correto
-4. Consulte os logs nos terminais para identificar erros específicos
+**UniPortal v2.0** - Mais simples, mais rápido, mais confiável! 🚀
 
-**Desenvolvido para o Controle de Gestão da TI** 🚀
-=======
-# System_ti
->>>>>>> e36849d2b4f20f10c3d8316a6a3784d1a9b7c634
+Para dúvidas ou suporte, consulte a documentação nas pastas `config/` e `scripts/`.

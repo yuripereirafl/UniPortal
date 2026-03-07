@@ -9,7 +9,7 @@ set -euo pipefail
 
 BRANCH=${1:-Portal_atual}
 USE_COMPOSE=${2:-true}
-TARGET_DIR="${HOME}/System_ti-main"
+TARGET_DIR="${HOME}/uniportal-main-fresh"
 REPO_URL="https://github.com/yuripereirafl/UniPortal.git"
 
 echo "-> Deploy simplified: branch=${BRANCH}, use_compose=${USE_COMPOSE}, target=${TARGET_DIR}"

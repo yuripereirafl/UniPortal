@@ -7,10 +7,39 @@
 }
 
 /* Loading states otimizados */
+/* Loading states otimizados - Skeletons Modernos */
 .loading-skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: loading-shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* Skeleton para modo escuro / glassmorphism */
+.skeleton-dark {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.05) 25%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+}
+
+.skeleton-text {
+  height: 12px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.skeleton-title {
+  height: 20px;
+  margin-bottom: 12px;
+  width: 60%;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
 }
 
 @keyframes loading-shimmer {

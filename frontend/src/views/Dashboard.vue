@@ -64,25 +64,16 @@
         </button>
         
         <button
-          v-if="$auth && ($auth.hasPermission('quadro_geral') || $auth.hasPermission('visualizar_quadro') || $auth.hasPermission('adm'))"
+          v-if="$auth && ($auth.hasPermission('adm'))"
           class="menu-item"
-          :class="{active: activePanel==='quadroColaboradores'}"
-          @click="activePanel='quadroColaboradores'"
+          :class="{active: activePanel==='celulares'}"
+          @click="activePanel='celulares'"
         >
-          <i class="fas fa-users-cog menu-icon"></i>
-          <span class="menu-text">Quadro de Colaboradores</span>
+          <i class="fas fa-mobile-alt menu-icon"></i>
+          <span class="menu-text">Celulares</span>
         </button>
         
-        <button
-          v-if="$auth && ($auth.hasPermission('meta_colaborador') || $auth.hasPermission('adm'))"
-          class="menu-item"
-          :class="{active: activePanel==='metaColaborador'}"
-          @click="activePanel='metaColaborador'"
-        >
-          <i class="fas fa-bullseye menu-icon"></i>
-          <span class="menu-text">Meta Colaborador</span>
-        </button>
-
+        <!-- REMOVIDO: Quadro de Colaboradores e Meta Colaborador -->
         
         <button
           v-if="$auth && ($auth.hasPermission('adm'))"
@@ -143,9 +134,7 @@
 
     <!-- Conteúdo Principal -->
     <main class="main-content" :class="{ expanded: isCollapsed }">
-      <component :is="panelComponent" v-if="activePanel !== 'quadroColaboradores' && activePanel !== 'metaColaborador'" />
-      <QuadroColaboradores v-else-if="activePanel === 'quadroColaboradores'" :colaboradores="funcionarios" />
-      <MetaColaborador v-else-if="activePanel === 'metaColaborador'" :colaboradores="funcionarios" />
+      <component :is="panelComponent" />
     </main>
   </div>
 </template>
@@ -160,14 +149,14 @@ import GruposWhatsapp from './GruposWhatsapp.vue';
 import Usuarios from './Usuarios.vue';
 import GruposPasta from './GruposPasta.vue';
 import Cargos from './Cargos.vue';
-import QuadroColaboradores from '../components/QuadroColaboradores.vue';
-import MetaColaborador from '../components/MetaColaborador.vue';
+import Celulares from './Celulares.vue';
+// REMOVIDOS: QuadroColaboradores, MetaColaborador (funcionalidades desabilitadas)
 
 import { API_BASE_URL } from '@/api.js';
 
 export default {
   name: 'Dashboard',
-  components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, QuadroColaboradores, MetaColaborador },
+  components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, Celulares },
   data() {
     return {
       // não definir por padrão 'dashboard' — vamos escolher no mounted() com base nas permissões
@@ -189,7 +178,7 @@ export default {
         case 'gruposEmail': return 'GruposEmail';
         case 'gruposWhatsapp': return 'GruposWhatsapp';
         case 'cargos': return 'Cargos';
-        case 'quadroColaboradores': return 'QuadroColaboradores';
+        case 'celulares': return 'Celulares';
         case 'configuracoes': return { template: '<div><h2 style="color:var(--cor-primaria);font-family:var(--font-titulo);">Configurações</h2><p>Configurações do sistema aparecerão aqui.</p></div>' };
         default: return 'DashboardPanel';
       }
@@ -230,10 +219,10 @@ export default {
             return;
           }
 
-          // Se tem permissão de meta_colaborador (e não é admin), vai para meta individual
+          // Se tem permissão de meta_colaborador (funcionalidade removida), vai para dashboard
           if (temPermissaoMeta) {
-            console.log('Usuário tem permissão meta_colaborador - direcionando para sua meta individual');
-            this.activePanel = 'metaColaborador';
+            console.log('Usuário tinha permissão meta_colaborador - direcionando para dashboard');
+            this.activePanel = 'dashboard';
             return;
           }
 
@@ -250,10 +239,10 @@ export default {
           }
         }
         
-        // Se nenhum dos casos acima, fallback seguro
-        this.activePanel = 'metaColaborador';
+        // Se nenhum dos casos acima, fallback para dashboard
+        this.activePanel = 'dashboard';
       } catch (e) {
-        this.activePanel = 'metaColaborador';
+        this.activePanel = 'dashboard';
       }
     },
     async carregarFuncionarios() {
@@ -292,16 +281,17 @@ export default {
 <style scoped>
 /* Container Principal */
 .dashboard-container {
-  min-height: 100vh;
-  background: #f8fafc;
+  height: 100vh;
+  background: #050a18;
   position: relative;
+  overflow: hidden;
 }
 
 /* CORTE ABSOLUTO - NADA PODE PASSAR DESTA LINHA */
 .sidebar {
   width: 280px;
   min-width: 280px;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+  background: #0f172a;
   color: white;
   display: flex;
   flex-direction: column;
@@ -310,10 +300,11 @@ export default {
   top: 0;
   left: 0;
   transition: width 0.2s ease, min-width 0.2s ease;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4);
   z-index: 1000;
   overflow: hidden;
   will-change: width;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Remover a máscara que estava ocultando o botão sair */
@@ -351,7 +342,9 @@ export default {
   max-width: 170px; 
   max-height: 50px; 
   object-fit: contain;
-  filter: brightness(1.1);
+  /* Garante visibilidade da logo em fundos escuros */
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
   will-change: transform;
 }
 
@@ -397,25 +390,26 @@ export default {
 .menu {
   flex: 1;
   padding: 1rem 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
   z-index: 1001;
-  margin-bottom: 5px;
 }
 
-/* Barreira sutil apenas no final do menu */
+/* Scrollbar fina para o menu */
+.menu::-webkit-scrollbar {
+  width: 4px;
+}
+.menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+/* Barreira sutil apenas no final do menu - REMOVIDO PARA CLEAN LOOK */
 .menu::after {
-  content: '';
-  position: absolute;
-  bottom: -5px;
-  left: 0;
-  right: 0;
-  height: 5px;
-  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
-  z-index: 5000;
-  pointer-events: none;
+  display: none;
 }
 
 .menu-item {
@@ -629,29 +623,19 @@ export default {
   }
 }
 
-/* Footer do Sidebar */
 .sidebar-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   margin-top: auto;
   flex-shrink: 0;
   position: relative;
   z-index: 9999;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
-  overflow: visible;
+  background: #0f172a;
   padding: 0.5rem 0;
 }
 
-/* Barreira apenas na parte superior do footer - não deve cobrir o botão */
+/* Barreira apenas na parte superior do footer - REMOVIDO PARA CLEAN LOOK */
 .sidebar-footer::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: 0;
-  right: 0;
-  height: 20px;
-  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
-  z-index: 10000;
-  pointer-events: none;
+  display: none;
 }
 
 /* Melhorar o estilo do botão sair */
@@ -763,9 +747,10 @@ export default {
   flex: 1;
   margin-left: 280px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
   overflow-x: hidden;
-  background: #f8fafc;
-  min-height: 100vh;
+  background: #050a18;
+  height: 100vh;
 }
 
 .main-content.expanded {
