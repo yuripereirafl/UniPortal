@@ -55,6 +55,7 @@ app.add_middleware(
     CORSMiddleware,
     # Permitir origin específica do frontend na VM e manter regex para outros ambientes locais
     allow_origins=[
+        "http://154.12.231.86:8080",  # Novo Servidor Linux
         "http://192.168.1.202:8080",  # Frontend na VMware
         "http://192.168.2.71:8080",   # IP local desta máquina
         "http://localhost:8080",
