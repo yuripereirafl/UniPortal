@@ -15,14 +15,14 @@ sys.path.insert(0, str(project_root))
 
 try:
     from config.settings import settings
-    print("✅ Usando configurações de banco centralizadas")
+    print("[DB] Usando configuracoes de banco centralizadas")
     
     # Usar configurações centralizadas
     SQLALCHEMY_DATABASE_URL = settings.database.url
     connect_args = settings.database.connect_args
     
 except ImportError:
-    print("⚠️  Erro ao importar config centralizadas. Usando fallback local.")
+    print("[DB] Erro ao importar config centralizadas. Usando fallback local.")
     
     # Fallback para configurações locais
     DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -44,13 +44,16 @@ from app.models.grupo_email import GrupoEmail
 from app.models.grupo_whatsapp import GrupoWhatsapp
 from app.models.grupo_pasta import GrupoPasta
 from app.models.usuario import Usuario
+from app.models.grupos import Grupo
+from app.models.permissao import Permissao
 from app.models.celular import CelularLinha, CelularConta
+from app.models.sla import SlaRule, TicketSla
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True,  
     pool_recycle=300,    
-    echo=True,
+    echo=False,
     connect_args=connect_args          
 )
 
@@ -68,10 +71,10 @@ def test_connection():
     try:
         with engine.connect() as connection:
             result = connection.execute(text("SELECT 1"))
-            print("✅ Conexão com PostgreSQL funcionando!")
+            print("[DB] Conexao com PostgreSQL funcionando!")
             return True
     except Exception as e:
-        print(f"❌ Erro na conexão: {e}")
+        print(f"[DB] Erro na conexao: {e}")
         return False
 
 # Para debug (opcional)

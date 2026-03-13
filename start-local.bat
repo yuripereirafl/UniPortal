@@ -4,21 +4,21 @@ echo =================================
 echo    UniPortal - Iniciando Sistema
 echo =================================
 echo.
-echo IP da Maquina: 192.168.1.11
-echo Frontend: http://192.168.1.11:8080
-echo Backend:  http://192.168.1.11:8000
+echo IP da Maquina: 154.12.231.86
+echo Frontend: http://154.12.231.86:8080
+echo Backend:  http://154.12.231.86:8000
 echo.
 
 REM Configurar variáveis de ambiente
-set VUE_APP_API_URL=http://192.168.1.11:8000
-set BACKEND_HOST=192.168.1.11
+set VUE_APP_API_URL=http://154.12.231.86:8000
+set BACKEND_HOST=154.12.231.86
 set BACKEND_PORT=8000
 
 echo [1/3] Ativando ambiente virtual...
 call .venv\Scripts\activate.bat
 
 echo [2/3] Iniciando Backend (uvicorn)...
-start "UniPortal Backend" cmd /c "cd backend && uvicorn app.main:app --host 192.168.1.11 --port 8000 --reload"
+start "UniPortal Backend" cmd /c "cd backend && uvicorn app.main:app --host 154.12.231.86 --port 8000 --reload"
 
 echo [3/3] Aguardando 3 segundos...
 timeout /t 3 /nobreak >nul
@@ -31,9 +31,9 @@ echo ========================================
 echo Sistema iniciado com sucesso!
 echo.
 echo Acesse o sistema em:
-echo Frontend: http://192.168.1.11:8080
-echo Backend API: http://192.168.1.11:8000
-echo Documentação: http://192.168.1.11:8000/docs
+echo Frontend: http://154.12.231.86:8080
+echo Backend API: http://154.12.231.86:8000
+echo Documentação: http://154.12.231.86:8000/docs
 echo ========================================
 echo.
 echo Pressione qualquer tecla para sair...

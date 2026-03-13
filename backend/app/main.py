@@ -33,23 +33,30 @@ from app.routes.usuario import router as usuario_router
 from app.routes.relatorios import router as relatorios_router
 from app.routes.permissoes import router as permissoes_router
 from app.routes.celular import router as celular_router
+from app.routes.sla import router as sla_router
 
 # REMOVIDO: módulos de vendas/metas/performance (realizado, performance, ranking,
 # vendas, nps, orcamentos, comissao, unidade_resumo, pagamentos, resumo_colaborador_email)
 
 # --- INICIALIZAÇÃO DA APLICAÇÃO ---
+from app.scheduler import start_scheduler
+
 app = FastAPI(
     title="UniPortal API",
     description="API para gestão de colaboradores, sistemas e acessos. Versão simplificada sem módulo de metas.",
     version="2.0.0"
 )
 
+@app.on_event("startup")
+def on_startup():
+    start_scheduler()
+
 app.add_middleware(
     CORSMiddleware,
     # Permitir origin específica do frontend na VM e manter regex para outros ambientes locais
     allow_origins=[
         "http://192.168.1.202:8080",  # Frontend na VMware
-        "http://192.168.1.11:8080",   # IP local desta máquina
+        "http://192.168.2.71:8080",   # IP local desta máquina
         "http://localhost:8080",
         "http://127.0.0.1:8080"
     ],
@@ -81,6 +88,7 @@ app.include_router(usuario_router)
 app.include_router(relatorios_router)
 app.include_router(permissoes_router)
 app.include_router(celular_router)
+app.include_router(sla_router, prefix="/sla", tags=["SLA & Chamados"])
 
 # REMOVIDO: routers de vendas/metas/performance
 

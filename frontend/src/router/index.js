@@ -89,6 +89,8 @@ const GruposEmail = () => import('../views/GruposEmail.vue');
 const Usuarios = () => import('../views/Usuarios.vue');
 const Login = () => import('../views/Login.vue');
 
+const SlaAudit = () => import('../views/SlaAudit.vue');
+
 const Configuracoes = { template: '<div><h2 style="color:var(--cor-primaria);font-family:var(--font-titulo);">Configurações</h2><p>Configurações do sistema aparecerão aqui.</p></div>' };
 
 const routes = [
@@ -101,7 +103,8 @@ const routes = [
   { path: '/grupos-pasta', component: GruposPasta },
   { path: '/grupos-email', component: GruposEmail },
   { path: '/configuracoes', component: Configuracoes },
-  { path: '/usuarios', component: Usuarios }
+  { path: '/usuarios', component: Usuarios },
+  { path: '/sla-audit', component: SlaAudit }
 ];
 
 const router = createRouter({

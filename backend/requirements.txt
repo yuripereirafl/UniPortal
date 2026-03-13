@@ -9,3 +9,5 @@ python-multipart
 pandas
 python-dotenv
 openpyxl
+schedule
+apscheduler

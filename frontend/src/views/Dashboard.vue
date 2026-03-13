@@ -23,6 +23,16 @@
           <span class="menu-text">Dashboard</span>
         </button>
         
+        <button 
+          v-if="$auth && $auth.hasPermission('adm')"
+          class="menu-item" 
+          :class="{active: activePanel==='sla'}" 
+          @click="activePanel='sla'"
+        >
+          <i class="fas fa-clipboard-check menu-icon"></i>
+          <span class="menu-text">Auditoria SLA</span>
+        </button>
+        
         <button
           v-if="$auth && ($auth.hasPermission('editar_colaborador') || $auth.hasPermission('adm'))"
           class="menu-item"
@@ -150,13 +160,14 @@ import Usuarios from './Usuarios.vue';
 import GruposPasta from './GruposPasta.vue';
 import Cargos from './Cargos.vue';
 import Celulares from './Celulares.vue';
+import SlaAudit from './SlaAudit.vue';
 // REMOVIDOS: QuadroColaboradores, MetaColaborador (funcionalidades desabilitadas)
 
 import { API_BASE_URL } from '@/api.js';
 
 export default {
   name: 'Dashboard',
-  components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, Celulares },
+  components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, Celulares, SlaAudit },
   data() {
     return {
       // não definir por padrão 'dashboard' — vamos escolher no mounted() com base nas permissões
@@ -179,6 +190,7 @@ export default {
         case 'gruposWhatsapp': return 'GruposWhatsapp';
         case 'cargos': return 'Cargos';
         case 'celulares': return 'Celulares';
+        case 'sla': return 'SlaAudit';
         case 'configuracoes': return { template: '<div><h2 style="color:var(--cor-primaria);font-family:var(--font-titulo);">Configurações</h2><p>Configurações do sistema aparecerão aqui.</p></div>' };
         default: return 'DashboardPanel';
       }
