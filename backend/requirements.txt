@@ -11,3 +11,4 @@ python-dotenv
 openpyxl
 schedule
 apscheduler
+requests
