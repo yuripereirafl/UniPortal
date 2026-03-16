@@ -17,13 +17,11 @@ def sync_sla_tickets_job():
     """
     Job que roda em background para sincronizar tickets do GLPI.
     """
-    print(f"[{datetime.now()}] Iniciando Sincronização Automática de SLA...")
+    today = datetime.now()
+    print(f"[SCHEDULER] [{today.strftime('%d/%m/%Y %H:%M:%S')}] Iniciando Sincronizacao Automatica de SLA...")
     
     db = SessionLocal()
     try:
-        # Para ser dinâmico e pegar apenas últimos dias (ex. últimos 3 dias ou o mês atual)
-        # Sincronizamos o mês atual inteiro a cada vez (o GLPI service já otimiza lendo apenas do dia atual até o fim, via id descending)
-        # Sincronizamos os últimos 30 dias para garantir que chamados abertos antes e fechados agora sejam capturados
         end_date_dt = today
         start_date_dt = today - timedelta(days=30)
         
@@ -34,7 +32,6 @@ def sync_sla_tickets_job():
         result = service.get_tickets_by_date_range(db, start_date, end_date)
         
         # --- TRAVA AUTOMÁTICA DE MESES ANTERIORES ---
-        # Qualquer chamado fechado antes do dia 1 do mês atual é marcado como auditado
         first_day_of_current_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         locked_count = db.query(TicketSla).filter(
@@ -44,11 +41,13 @@ def sync_sla_tickets_job():
         
         if locked_count > 0:
             db.commit()
-            print(f"[{datetime.now()}] Trava Automática: {locked_count} chamados de meses anteriores foram fixados.")
+            print(f"[SCHEDULER] Trava Automatica: {locked_count} chamados de meses anteriores fixados.")
         
-        print(f"[{datetime.now()}] Sincronização automática concluída: {result}")
+        print(f"[SCHEDULER] [{datetime.now().strftime('%H:%M:%S')}] Sincronizacao concluida: {result}")
     except Exception as e:
-        print(f"[{datetime.now()}] Erro durante a sincronização automática: {e}")
+        print(f"[SCHEDULER] ERRO na sincronizacao automatica: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         db.close()
 
