@@ -20,6 +20,9 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - SECRET_KEY=${SECRET_KEY}
+      - GLPI_BASE_URL=${GLPI_BASE_URL}
+      - GLPI_APP_TOKEN=${GLPI_APP_TOKEN}
+      - GLPI_USER_TOKEN=${GLPI_USER_TOKEN}
     networks:
       - uniportal-network
     restart: unless-stopped
