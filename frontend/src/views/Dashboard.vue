@@ -82,6 +82,26 @@
           <i class="fas fa-mobile-alt menu-icon"></i>
           <span class="menu-text">Celulares</span>
         </button>
+
+        <button
+          v-if="$auth && ($auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='notebooks'}"
+          @click="activePanel='notebooks'"
+        >
+          <i class="fas fa-laptop menu-icon"></i>
+          <span class="menu-text">Notebooks</span>
+        </button>
+
+        <button
+          v-if="$auth && ($auth.hasPermission('adm'))"
+          class="menu-item"
+          :class="{active: activePanel==='dominios'}"
+          @click="activePanel='dominios'"
+        >
+          <i class="fas fa-globe menu-icon"></i>
+          <span class="menu-text">Domínios</span>
+        </button>
         
         <!-- REMOVIDO: Quadro de Colaboradores e Meta Colaborador -->
         
@@ -146,6 +166,27 @@
     <main class="main-content" :class="{ expanded: isCollapsed }">
       <component :is="panelComponent" />
     </main>
+
+    <!-- Modal de Alerta de Domínios -->
+    <div v-if="showDominioAlert" class="modal-overlay alert-modal">
+      <div class="modal-content alert-content">
+        <div class="alert-header">
+          <h3><i class="fas fa-exclamation-triangle"></i> Atenção: Domínios Vencendo</h3>
+        </div>
+        <div class="alert-body">
+          <p class="alert-desc">Os seguintes domínios estão com vencimento próximo ou já expiraram. Por favor, regularize-os para evitar inatividade do sistema:</p>
+          <ul class="alert-list">
+            <li v-for="dom in dominiosAlertList" :key="dom.id">
+              <strong>{{ dom.dominio }}</strong>
+              <span class="alert-days">{{ dom.diasTexto }}</span>
+            </li>
+          </ul>
+        </div>
+        <div class="alert-footer">
+          <button class="alert-btn" @click="showDominioAlert = false">Estou Ciente</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -160,6 +201,8 @@ import Usuarios from './Usuarios.vue';
 import GruposPasta from './GruposPasta.vue';
 import Cargos from './Cargos.vue';
 import Celulares from './Celulares.vue';
+import Notebooks from './Notebooks.vue';
+import Dominios from './Dominios.vue';
 import SlaAudit from './SlaAudit.vue';
 // REMOVIDOS: QuadroColaboradores, MetaColaborador (funcionalidades desabilitadas)
 
@@ -167,14 +210,16 @@ import { API_BASE_URL } from '@/api.js';
 
 export default {
   name: 'Dashboard',
-  components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, Celulares, SlaAudit },
+  components: { Funcionarios, Sistemas, DashboardPanel, Setores, GruposEmail, GruposWhatsapp, Usuarios, GruposPasta, Cargos, Celulares, Notebooks, Dominios, SlaAudit },
   data() {
     return {
       // não definir por padrão 'dashboard' — vamos escolher no mounted() com base nas permissões
       activePanel: null,
       funcionarios: [],
       isCollapsed: false,
-      isMobile: false
+      isMobile: false,
+      showDominioAlert: false,
+      dominiosAlertList: []
     }
   },
   computed: {
@@ -190,6 +235,8 @@ export default {
         case 'gruposWhatsapp': return 'GruposWhatsapp';
         case 'cargos': return 'Cargos';
         case 'celulares': return 'Celulares';
+        case 'notebooks': return 'Notebooks';
+        case 'dominios': return 'Dominios';
         case 'sla': return 'SlaAudit';
         case 'configuracoes': return { template: '<div><h2 style="color:var(--cor-primaria);font-family:var(--font-titulo);">Configurações</h2><p>Configurações do sistema aparecerão aqui.</p></div>' };
         default: return 'DashboardPanel';
@@ -206,6 +253,12 @@ export default {
     this._onAuthUpdated = onAuthUpdated;
 
     this.carregarFuncionarios();
+    
+    // Checar se o user tem permissão de admin para checar domínios
+    if (this.$auth && this.$auth.hasPermission('adm')) {
+      this.checkDominiosExpiration();
+    }
+
     this.checkScreenSize();
     window.addEventListener('resize', this.checkScreenSize);
   },
@@ -271,6 +324,46 @@ export default {
       } catch (e) {
         console.error('Erro ao carregar funcionários:', e);
         this.funcionarios = [];
+      }
+    },
+    async checkDominiosExpiration() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/dominios/`);
+        if (!response.ok) return;
+        const dominios = await response.json();
+        
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        const expiring = [];
+        dominios.forEach(d => {
+          if (!d.data_vencimento) return;
+          const venc = new Date(d.data_vencimento + 'T00:00:00');
+          const diff = venc.getTime() - hoje.getTime();
+          const dias = Math.ceil(diff / (1000 * 3600 * 24));
+          
+          if (dias <= 20) {
+            let texto = `Expira em ${dias} dia(s)`;
+            if (dias < 0) texto = `Expirado há ${Math.abs(dias)} dia(s)`;
+            else if (dias === 0) texto = "Expira HOJE";
+            
+            expiring.push({
+              id: d.id,
+              dominio: d.dominio,
+              dias,
+              diasTexto: texto
+            });
+          }
+        });
+        
+        if (expiring.length > 0) {
+          // Sort so the most urgent (lowest days) is at the top
+          expiring.sort((a, b) => a.dias - b.dias);
+          this.dominiosAlertList = expiring;
+          this.showDominioAlert = true;
+        }
+      } catch (e) {
+        console.error('Erro ao checar domínios:', e);
       }
     },
     toggleSidebar() {
@@ -875,5 +968,139 @@ export default {
   to {
     transform: translateX(-100%);
   }
+}
+
+/* Modal de Alerta de Domínios - Premium Design */
+.alert-modal { 
+  position: fixed; 
+  inset: 0; 
+  background: rgba(5, 10, 24, 0.7); 
+  backdrop-filter: blur(12px); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  z-index: 99999; 
+  padding: 20px;
+}
+.alert-content { 
+  background: #ffffff; 
+  border-radius: 24px; 
+  width: 100%; 
+  max-width: 480px; 
+  box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.25), 0 0 0 1px rgba(239, 68, 68, 0.1); 
+  overflow: hidden; 
+  animation: modalAlertIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); 
+  display: flex;
+  flex-direction: column;
+  border: none;
+}
+@keyframes modalAlertIn { 
+  from { opacity: 0; transform: translateY(40px) scale(0.95); } 
+  to { opacity: 1; transform: translateY(0) scale(1); } 
+}
+.alert-header { 
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); 
+  padding: 24px 32px; 
+  border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+}
+.alert-header h3 { 
+  margin: 0; 
+  color: #b91c1c; 
+  font-size: 1.4rem; 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  font-weight: 800; 
+}
+.alert-header h3 i {
+  font-size: 1.6rem;
+  color: #ef4444;
+}
+.alert-body {
+  padding: 32px;
+}
+.alert-desc { 
+  color: #475569; 
+  font-size: 15px; 
+  margin-top: 0; 
+  margin-bottom: 24px; 
+  line-height: 1.5;
+}
+.alert-list { 
+  list-style: none; 
+  padding: 0; 
+  margin: 0; 
+  max-height: 280px; 
+  overflow-y: auto; 
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 8px;
+}
+.alert-list::-webkit-scrollbar { width: 6px; }
+.alert-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.alert-list li { 
+  background: #f8fafc; 
+  border: 1px solid #e2e8f0; 
+  padding: 16px; 
+  border-radius: 12px; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.alert-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: #cbd5e1;
+}
+.alert-list li strong { 
+  color: #0f172a; 
+  font-size: 15px; 
+  font-weight: 700;
+}
+.alert-days { 
+  font-size: 13px; 
+  font-weight: 700; 
+  color: #ef4444; 
+  background: #fef2f2; 
+  padding: 6px 12px; 
+  border-radius: 20px; 
+  border: 1px solid #fee2e2;
+  white-space: nowrap;
+}
+.alert-footer {
+  padding: 0 32px 32px 32px;
+}
+.alert-btn { 
+  width: 100%; 
+  padding: 16px; 
+  font-size: 16px; 
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+.alert-btn:hover { 
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+.alert-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsividade do modal */
+@media (max-width: 480px) {
+  .alert-header { padding: 20px; }
+  .alert-body { padding: 20px; }
+  .alert-footer { padding: 0 20px 20px 20px; }
+  .alert-list li { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .alert-days { align-self: flex-start; }
 }
 </style>

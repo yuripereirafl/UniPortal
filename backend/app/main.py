@@ -34,6 +34,8 @@ from app.routes.relatorios import router as relatorios_router
 from app.routes.permissoes import router as permissoes_router
 from app.routes.celular import router as celular_router
 from app.routes.sla import router as sla_router
+from app.routes.notebooks import router as notebooks_router
+from app.routes.dominios import router as dominios_router
 
 # REMOVIDO: módulos de vendas/metas/performance (realizado, performance, ranking,
 # vendas, nps, orcamentos, comissao, unidade_resumo, pagamentos, resumo_colaborador_email)
@@ -90,6 +92,8 @@ app.include_router(relatorios_router)
 app.include_router(permissoes_router)
 app.include_router(celular_router)
 app.include_router(sla_router, prefix="/sla", tags=["SLA & Chamados"])
+app.include_router(notebooks_router, prefix="/notebooks", tags=["Notebooks"])
+app.include_router(dominios_router, prefix="/dominios", tags=["Domínios Internet"])
 
 # REMOVIDO: routers de vendas/metas/performance
 

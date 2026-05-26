@@ -2,7 +2,7 @@
 # PowerShell Script para usar IP da máquina local
 
 # Configurações
-$LocalIP = "154.12.231.86"
+$LocalIP = "127.0.0.1"
 $BackendPort = 8000
 $FrontendPort = 8080
 

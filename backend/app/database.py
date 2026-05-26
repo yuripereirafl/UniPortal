@@ -48,6 +48,8 @@ from app.models.grupos import Grupo
 from app.models.permissao import Permissao
 from app.models.celular import CelularLinha, CelularConta
 from app.models.sla import SlaRule, TicketSla
+from app.models.notebook import Notebook
+from app.models.dominio import Dominio
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

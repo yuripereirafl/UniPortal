@@ -11,21 +11,24 @@ funcionario_setor = Table(
     'funcionario_setor', Base.metadata,
     Column('funcionario_id', Integer, ForeignKey('rh_homologacao.funcionarios.id')),
     Column('setor_id', Integer, ForeignKey('rh_homologacao.setores.id')),
-    schema='rh_homologacao'
+    schema='rh_homologacao',
+    extend_existing=True
 )
 
 funcionario_sistema = Table(
     'funcionario_sistema', Base.metadata,
     Column('funcionario_id', Integer, ForeignKey('rh_homologacao.funcionarios.id')),
     Column('sistema_id', Integer, ForeignKey('rh_homologacao.sistemas.id')),
-    schema='rh_homologacao'
+    schema='rh_homologacao',
+    extend_existing=True
 )
 
 funcionario_grupo_email = Table(
     'funcionario_grupo_email', Base.metadata,
     Column('funcionario_id', Integer, ForeignKey('rh_homologacao.funcionarios.id')),
     Column('grupo_email_id', Integer, ForeignKey('rh_homologacao.grupos_email.id')),
-    schema='rh_homologacao'
+    schema='rh_homologacao',
+    extend_existing=True
 )
 
 # Importar as tabelas de associação
@@ -34,7 +37,7 @@ from app.models.funcionario_grupo_whatsapp import funcionario_grupo_whatsapp
 
 class Funcionario(Base):
     __tablename__ = 'funcionarios'
-    __table_args__ = {'schema': 'rh_homologacao'}
+    __table_args__ = {'schema': 'rh_homologacao', 'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, nullable=False)
     sobrenome = Column(String, nullable=False)
