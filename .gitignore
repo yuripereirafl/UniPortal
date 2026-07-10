@@ -2,32 +2,46 @@
 .env
 *.env
 
-# Python
+# Python e Ambientes Virtuais
 *.pyc
 __pycache__/
 backend/__pycache__/
+.venv/
+venv/
+env/
+ENV/
 
-# Node.js
+# Node.js e Builds
 node_modules/
 frontend/node_modules/
+frontend/dist/
 
 # Docker volumes e bancos locais
 volumes/
 *.sqlite3
 db.sqlite3
 
-# Logs, backups e temporários
+# Logs, backups e temporarios
 *.log
 *.bak
 *.swp
 *.tmp
 *.temp
+*.txt
+db_output.txt
+sync_output*.txt
+output*.txt
 
-# VSCode e sistema
+# Arquivos de Dados e Excel
+*.xlsx
+*.xls
+*.csv
+
+# Editores de Codigo e IDEs
 .vscode/
+.idea/
 .DS_Store
 
 # Dumps e scripts de banco
 *.dump
 *.sql
-*.md
