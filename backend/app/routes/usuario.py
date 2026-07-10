@@ -20,29 +20,43 @@ router = APIRouter()
 def listar_usuarios(db: Session = Depends(get_db)):
     # Otimizado para trazer setores em uma única query
     usuarios = db.query(UsuarioModel).options(selectinload(UsuarioModel.setores)).all()
-    print("[DEBUG] Usuários carregados:")
-    for u in usuarios:
-        print(f"Usuário: {u.id} - {u.username} | Setores: {[{'id': s.id, 'nome': s.nome} for s in u.setores]}")
+    
+    # 1. Carregar permissões diretas de todos os usuários de uma vez
+    direct_perms_raw = db.query(usuarios_permissoes.c.usuario_id, PermissaoModel).join(
+        PermissaoModel, PermissaoModel.id == usuarios_permissoes.c.permissao_id
+    ).all()
+
+    # 2. Carregar permissões via grupos de todos os usuários de uma vez
+    from ..models.usuario_grupo import usuario_grupo
+    from ..models.grupo_permissao import grupo_permissao
+    group_perms_raw = db.query(usuario_grupo.c.usuario_id, PermissaoModel).join(
+        grupo_permissao, grupo_permissao.c.grupo_id == usuario_grupo.c.grupo_id
+    ).join(
+        PermissaoModel, PermissaoModel.id == grupo_permissao.c.permissao_id
+    ).all()
+
+    # Agrupar permissões por usuario_id
+    user_perms_map = {}
+    for uid, perm in direct_perms_raw:
+        if uid not in user_perms_map:
+            user_perms_map[uid] = {}
+        user_perms_map[uid][perm.id] = perm
+
+    for uid, perm in group_perms_raw:
+        if uid not in user_perms_map:
+            user_perms_map[uid] = {}
+        user_perms_map[uid][perm.id] = perm
+
+    def normalize_code(s):
+        if s is None:
+            return ''
+        return ''.join(ch for ch in str(s).strip().lower().replace(' ', '_') if (ch.isalnum() or ch == '_'))
+
     result = []
     for u in usuarios:
-        # carregar permissões vinculadas via tabela usuarios_permissoes (diretas)
-        permissoes_direct = db.query(PermissaoModel).join(usuarios_permissoes).filter(usuarios_permissoes.c.usuario_id == u.id).all()
-        # carregar permissões via grupos do usuário
-        from ..models.usuario_grupo import usuario_grupo
-        # nome correto da tabela de associação é 'grupo_permissao' (definida em grupo_permissao.py)
-        from ..models.grupo_permissao import grupo_permissao
-        permissoes_via_grupo = db.query(PermissaoModel).join(grupo_permissao).join(usuario_grupo, grupo_permissao.c.grupo_id == usuario_grupo.c.grupo_id).filter(usuario_grupo.c.usuario_id == u.id).all()
-        # deduplicar
-        permissoes_map = {p.id: p for p in (permissoes_direct + permissoes_via_grupo)}
-        permissoes = list(permissoes_map.values())
-
-        def normalize_code(s):
-            if s is None:
-                return ''
-            return ''.join(ch for ch in str(s).strip().lower().replace(' ', '_') if (ch.isalnum() or ch == '_'))
-
+        perm_dict = user_perms_map.get(u.id, {})
         permissoes_out = []
-        for p in permissoes:
+        for p in perm_dict.values():
             permissoes_out.append({
                 "id": p.id,
                 "codigo": p.codigo,
