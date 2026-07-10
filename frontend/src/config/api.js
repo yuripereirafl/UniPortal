@@ -30,20 +30,20 @@ function detectEnvironment() {
  * Todo o sistema usa apenas o servidor externo
  */
 const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-const dynamicBaseUrl = `http://${hostname}:8000`;
+const dynamicBaseUrl = `http://${hostname}:8001`;
 
 const CONFIG_BY_ENVIRONMENT = {
   development: {
     BASE_URL: dynamicBaseUrl,
-    WS_URL: `ws://${hostname}:8000`
+    WS_URL: `ws://${hostname}:8001`
   },
   production: {
     BASE_URL: dynamicBaseUrl,
-    WS_URL: `ws://${hostname}:8000`
+    WS_URL: `ws://${hostname}:8001`
   },
   testing: {
     BASE_URL: dynamicBaseUrl,
-    WS_URL: `ws://${hostname}:8000`
+    WS_URL: `ws://${hostname}:8001`
   }
 };
 

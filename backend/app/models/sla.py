@@ -27,3 +27,4 @@ class TicketSla(Base):
     etapas_total = Column(Integer, default=0)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     is_audited = Column(Boolean, default=False)
+    area = Column(String, default="TI")

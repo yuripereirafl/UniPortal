@@ -5,11 +5,36 @@ from app.models.sla import SlaRule, TicketSla
 from app.services.glpi_service import GLPIService
 from datetime import datetime
 from sqlalchemy import func, String
+from app.routes.usuario import get_current_user
 
 router = APIRouter()
 
+def get_user_sla_area(db: Session, user) -> str:
+    """ Checks if the user has 'infra' permission to return 'INFRA', otherwise returns 'TI' """
+    try:
+        from app.models.permissao import Permissao as PermissaoModel
+        from app.models.usuarios_permissoes import usuarios_permissoes
+        from app.models.usuario_grupo import usuario_grupo
+        from app.models.grupo_permissao import grupo_permissao
+
+        permissoes_direct = db.query(PermissaoModel).join(usuarios_permissoes).filter(usuarios_permissoes.c.usuario_id == user.id).all()
+        permissoes_via_grupo = db.query(PermissaoModel).join(grupo_permissao).join(usuario_grupo, grupo_permissao.c.grupo_id == usuario_grupo.c.grupo_id).filter(usuario_grupo.c.usuario_id == user.id).all()
+        
+        codigos = {p.codigo.upper() for p in (permissoes_direct + permissoes_via_grupo)}
+        
+        if "INFRA" in codigos:
+            return "INFRA"
+    except Exception as e:
+        print(f"Error checking user SLA area permissions: {e}")
+    return "TI"
+
 @router.get("/stats")
-def get_sla_stats(start_date: str = Query(None), end_date: str = Query(None), db: Session = Depends(get_db)):
+def get_sla_stats(
+    start_date: str = Query(None), 
+    end_date: str = Query(None), 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     today = datetime.now()
     if not start_date:
         start_date = today.replace(day=1).strftime("%Y-%m-%d")
@@ -19,9 +44,12 @@ def get_sla_stats(start_date: str = Query(None), end_date: str = Query(None), db
     d_start = datetime.strptime(start_date, "%Y-%m-%d")
     d_end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     
+    area = get_user_sla_area(db, current_user)
+    
     tickets = db.query(TicketSla).filter(
         TicketSla.data_fechamento >= d_start,
-        TicketSla.data_fechamento <= d_end
+        TicketSla.data_fechamento <= d_end,
+        TicketSla.area == area
     ).all()
     
     if not tickets:
@@ -79,14 +107,12 @@ def get_sla_stats(start_date: str = Query(None), end_date: str = Query(None), db
 
     last_update = None
     if tickets:
-        # Pega a data mais recente de atualização entre os tickets do período
         dates = [t.updated_at for t in tickets if t.updated_at]
         if dates:
             last_update = max(dates).strftime("%d/%m/%Y %H:%M:%S")
 
-    # Preparar dados para os gráficos
     chart_data = {
-        "labels": [cat["name"] for cat in by_category[:8]], # Top 8 categorias
+        "labels": [cat["name"] for cat in by_category[:8]],
         "series": [cat["total"] for cat in by_category[:8]],
         "sla_series": [round(cat["percent"], 1) for cat in by_category[:8]]
     }
@@ -107,7 +133,13 @@ def get_sla_stats(start_date: str = Query(None), end_date: str = Query(None), db
     }
 
 @router.get("/tickets")
-def list_tickets(start_date: str = Query(None), end_date: str = Query(None), q: str = Query(None), db: Session = Depends(get_db)):
+def list_tickets(
+    start_date: str = Query(None), 
+    end_date: str = Query(None), 
+    q: str = Query(None), 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     today = datetime.now()
     if not start_date:
         start_date = today.replace(day=1).strftime("%Y-%m-%d")
@@ -117,9 +149,12 @@ def list_tickets(start_date: str = Query(None), end_date: str = Query(None), q: 
     d_start = datetime.strptime(start_date, "%Y-%m-%d")
     d_end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     
+    area = get_user_sla_area(db, current_user)
+    
     query = db.query(TicketSla).filter(
         TicketSla.data_fechamento >= d_start,
-        TicketSla.data_fechamento <= d_end
+        TicketSla.data_fechamento <= d_end,
+        TicketSla.area == area
     )
     if q:
         query = query.filter(
@@ -131,7 +166,12 @@ def list_tickets(start_date: str = Query(None), end_date: str = Query(None), q: 
     return query.order_by(TicketSla.data_fechamento.desc()).all()
 
 @router.post("/sync")
-def sync_glpi(start_date: str = Query(None), end_date: str = Query(None), db: Session = Depends(get_db)):
+def sync_glpi(
+    start_date: str = Query(None), 
+    end_date: str = Query(None), 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     today = datetime.now()
     if not start_date:
         start_date = today.replace(day=1).strftime("%Y-%m-%d")
@@ -145,5 +185,5 @@ def sync_glpi(start_date: str = Query(None), end_date: str = Query(None), db: Se
     return result
 
 @router.get("/rules")
-def get_rules(db: Session = Depends(get_db)):
+def get_rules(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     return db.query(SlaRule).all()

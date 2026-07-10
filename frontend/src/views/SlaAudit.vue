@@ -10,7 +10,7 @@
       <!-- Header -->
       <header class="page-header">
         <div class="header-titles">
-          <h1>Auditoria de <span>SLA T.I</span></h1>
+          <h1>Auditoria de <span>SLA {{ $auth && $auth.hasPermission('infra') ? 'Infraestrutura' : 'T.I.' }}</span></h1>
           <p>Monitoramento de performance e conformidade de chamados</p>
         </div>
 

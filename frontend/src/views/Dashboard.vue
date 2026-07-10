@@ -24,7 +24,7 @@
         </button>
         
         <button 
-          v-if="$auth && $auth.hasPermission('adm')"
+          v-if="$auth && ($auth.hasPermission('adm') || $auth.hasPermission('infra'))"
           class="menu-item" 
           :class="{active: activePanel==='sla'}" 
           @click="activePanel='sla'"
@@ -275,12 +275,20 @@ export default {
           // Verificar permissões específicas
           const temPermissaoMeta = auth.hasPermission('meta_colaborador');
           const temPermissaoAdmin = auth.hasPermission('adm');
+          const temPermissaoInfra = auth.hasPermission('infra');
           const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
           const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
 
           // Se tem permissão admin, pode ver tudo
           if (temPermissaoAdmin) {
             this.activePanel = 'dashboard';
+            return;
+          }
+
+          // Se tem permissão de infra (e não é admin), vai para SLA
+          if (temPermissaoInfra) {
+            console.log('Usuário tem permissão infra - direcionando para Auditoria SLA');
+            this.activePanel = 'sla';
             return;
           }
 

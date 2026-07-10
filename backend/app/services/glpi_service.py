@@ -168,10 +168,11 @@ class GLPIService:
                         cat_full_name = "OUTROS"
 
             # REGRA DE OURO: Só pegar se for T.I ou se o nome completo contiver T.I (ex: "T.I > ACESSOS")
-            # Ignorar explicitamente INFRAESTRUTURA e OUVIDORIA se não estiverem sob T.I
+            # Ou se contiver INFRAESTRUTURA / INFRA (ex: "CHAMADOS INFRAESTRUTURA > VAZAMENTO")
             is_ti = "T.I" in cat_full_name or "TI" in cat_full_name
+            is_infra = "INFRAESTRUTURA" in cat_full_name or "INFRA" in cat_full_name
             
-            if not is_ti:
+            if not (is_ti or is_infra):
                 continue
             
             all_ti_ids.append(glpi_id)
@@ -187,30 +188,50 @@ class GLPIService:
             
             # Tenta match por nome da categoria no ticket vs TIPO na regra
             for r_tipo, r_obj in rules.items():
-                # Exemplos na planilha: "CHAMADOS TI - ACESSOS", "CHAMADOS TI - ERP"
-                # Exemplos no GLPI: "ACESSOS", "ERP"
-                clean_r_tipo = r_tipo.replace("CHAMADOS TI - ", "").strip()
-                if cat_name == clean_r_tipo or cat_name in clean_r_tipo or clean_r_tipo in cat_name:
-                    rule = r_obj
-                    break
+                # Exemplos na planilha: "CHAMADOS TI - ACESSOS", "CHAMADOS INFRAESTRUTURA - VAZAMENTO"
+                # Exemplos no GLPI: "ACESSOS", "VAZAMENTO"
+                clean_r_tipo = r_tipo.replace("CHAMADOS TI - ", "").replace("CHAMADOS INFRAESTRUTURA - ", "").strip()
+                
+                is_rule_ti = "CHAMADOS TI -" in r_tipo
+                is_rule_infra = "CHAMADOS INFRAESTRUTURA -" in r_tipo
+                
+                if is_ti and is_rule_ti:
+                    if cat_name == clean_r_tipo or cat_name in clean_r_tipo or clean_r_tipo in cat_name:
+                        rule = r_obj
+                        break
+                elif is_infra and is_rule_infra:
+                    if cat_name == clean_r_tipo or cat_name in clean_r_tipo or clean_r_tipo in cat_name:
+                        rule = r_obj
+                        break
             
             if not rule:
                 # Tenta match pelo título do chamado (backup)
                 ticket_title = t.get("name", "").upper()
                 for r_tipo, r_obj in rules.items():
-                    clean_r_tipo = r_tipo.replace("CHAMADOS TI - ", "").strip()
-                    if clean_r_tipo in ticket_title and len(clean_r_tipo) > 3:
-                        rule = r_obj
-                        break
+                    clean_r_tipo = r_tipo.replace("CHAMADOS TI - ", "").replace("CHAMADOS INFRAESTRUTURA - ", "").strip()
+                    is_rule_ti = "CHAMADOS TI -" in r_tipo
+                    is_rule_infra = "CHAMADOS INFRAESTRUTURA -" in r_tipo
+                    
+                    if is_ti and is_rule_ti:
+                        if clean_r_tipo in ticket_title and len(clean_r_tipo) > 3:
+                            rule = r_obj
+                            break
+                    elif is_infra and is_rule_infra:
+                        if clean_r_tipo in ticket_title and len(clean_r_tipo) > 3:
+                            rule = r_obj
+                            break
             
-            # Se ainda não achou regra específica mas sabemos que é TI, usa a regra OUTROS da TI
+            # Se ainda não achou regra específica mas sabemos a área, usa a regra OUTROS correspondente
             if not rule:
-                rule = rules.get("CHAMADOS TI - OUTROS")
+                if is_ti:
+                    rule = rules.get("CHAMADOS TI - OUTROS")
+                elif is_infra:
+                    rule = rules.get("CHAMADOS INFRAESTRUTURA - OUTROS")
 
             # Definir a categoria final para exibição no Dashboard (baseado na regra achada)
             final_category = cat_name
             if rule:
-                final_category = rule.tipo.replace("CHAMADOS TI - ", "").strip()
+                final_category = rule.tipo.replace("CHAMADOS TI - ", "").replace("CHAMADOS INFRAESTRUTURA - ", "").strip()
                 if not final_category:
                     final_category = "OUTROS"
 
@@ -263,6 +284,7 @@ class GLPIService:
                     existing.status_sla = status_sla
                     existing.mes_referencia = month_str
                     existing.etapas_total = etapas_total
+                    existing.area = "INFRA" if is_infra else "TI"
                 else:
                     new_ticket = TicketSla(
                         glpi_id=glpi_id,
@@ -273,7 +295,8 @@ class GLPIService:
                         tempo_atendimento_minutos=tempo_minutos,
                         status_sla=status_sla,
                         mes_referencia=month_str,
-                        etapas_total=etapas_total
+                        etapas_total=etapas_total,
+                        area="INFRA" if is_infra else "TI"
                     )
                     db.add(new_ticket)
                     new_count += 1
