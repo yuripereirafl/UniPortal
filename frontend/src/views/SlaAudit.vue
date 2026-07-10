@@ -31,11 +31,7 @@
             </button>
           </div>
 
-          <button v-if="!($auth && $auth.hasPermission('infra'))" @click="syncData" :disabled="syncing || loading" class="btn-sync-now glass-panel" :title="'Importar chamados do GLPI para o período selecionado'">
-            <i :class="syncing ? 'fas fa-spinner fa-spin' : 'fas fa-sync-alt'"></i>
-            {{ syncing ? 'Sincronizando...' : 'Sincronizar GLPI' }}
-          </button>
-          
+
           <button @click="exportToExcel" class="btn-print glass-panel no-print">
             <i class="fas fa-file-excel"></i>
             Exportar Excel
