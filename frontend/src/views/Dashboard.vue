@@ -271,50 +271,66 @@ export default {
     selectInitialPanel() {
       try {
         const auth = this.$auth;
-        if (auth && typeof auth.hasPermission === 'function') {
-          // Verificar permissões específicas
-          const temPermissaoMeta = auth.hasPermission('meta_colaborador');
-          const temPermissaoAdmin = auth.hasPermission('adm');
-          const temPermissaoInfra = auth.hasPermission('infra');
-          const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
-          const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
-
-          // Se tem permissão admin, pode ver tudo
-          if (temPermissaoAdmin) {
-            this.activePanel = 'dashboard';
-            return;
-          }
-
-          // Se tem permissão de infra (e não é admin), vai para SLA
-          if (temPermissaoInfra) {
-            console.log('Usuário tem permissão infra - direcionando para Auditoria SLA');
-            this.activePanel = 'sla';
-            return;
-          }
-
-          // Se tem permissão de meta_colaborador (funcionalidade removida), vai para dashboard
-          if (temPermissaoMeta) {
-            console.log('Usuário tinha permissão meta_colaborador - direcionando para dashboard');
-            this.activePanel = 'dashboard';
-            return;
-          }
-
-          // Se tem permissão para editar usuários
-          if (temPermissaoEditarUsuario) {
-            this.activePanel = 'usuarios';
-            return;
-          }
-
-          // Se tem permissão para editar colaboradores
-          if (temPermissaoEditarColaborador) {
-            this.activePanel = 'funcionarios';
-            return;
-          }
+        if (!auth || typeof auth.hasPermission !== 'function') {
+          // Auth ainda não está pronto — aguarda evento
+          this.activePanel = null;
+          return;
         }
-        
-        // Se nenhum dos casos acima, fallback para dashboard
+
+        // Verificar se as permissões foram realmente carregadas
+        // (se _perms_normalized estiver vazio, pode ser que o usuário ainda não carregou)
+        const user = auth.getCurrentUser ? auth.getCurrentUser() : null;
+        const permsCarregadas = user && Array.isArray(user._perms_normalized) && user._perms_normalized.length > 0;
+
+        if (!permsCarregadas && !user) {
+          // Sem usuário ainda — aguarda o evento auth:updated
+          this.activePanel = null;
+          return;
+        }
+
+        const temPermissaoAdmin = auth.hasPermission('adm');
+        const temPermissaoInfra = auth.hasPermission('infra');
+        const temPermissaoEditarColaborador = auth.hasPermission('editar_colaborador');
+        const temPermissaoEditarUsuario = auth.hasPermission('editar_usuario');
+        const temPermissaoMeta = auth.hasPermission('meta_colaborador');
+
+        console.log('[Dashboard] Permissões:', { temPermissaoAdmin, temPermissaoInfra, temPermissaoEditarColaborador, temPermissaoEditarUsuario });
+
+        // Se tem permissão admin, pode ver tudo
+        if (temPermissaoAdmin) {
+          this.activePanel = 'dashboard';
+          return;
+        }
+
+        // Se tem permissão de infra (e não é admin), vai diretamente para SLA de Infraestrutura
+        if (temPermissaoInfra) {
+          console.log('[Dashboard] Usuário INFRA - direcionando para Auditoria SLA Infraestrutura');
+          this.activePanel = 'sla';
+          return;
+        }
+
+        // Se tem permissão de meta_colaborador (funcionalidade removida), vai para dashboard
+        if (temPermissaoMeta) {
+          this.activePanel = 'dashboard';
+          return;
+        }
+
+        // Se tem permissão para editar usuários
+        if (temPermissaoEditarUsuario) {
+          this.activePanel = 'usuarios';
+          return;
+        }
+
+        // Se tem permissão para editar colaboradores
+        if (temPermissaoEditarColaborador) {
+          this.activePanel = 'funcionarios';
+          return;
+        }
+
+        // Fallback para dashboard
         this.activePanel = 'dashboard';
       } catch (e) {
+        console.error('[Dashboard] Erro em selectInitialPanel:', e);
         this.activePanel = 'dashboard';
       }
     },

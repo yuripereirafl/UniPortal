@@ -24,12 +24,17 @@
             <input type="date" v-model="startDate" class="date-input" />
             <span class="separator">até</span>
             <input type="date" v-model="endDate" class="date-input" />
-            <button @click="handleSearch" :disabled="loading" class="btn-search">
+            <button @click="handleSearch" :disabled="loading || syncing" class="btn-search">
               <i v-if="loading" class="fas fa-spinner fa-spin"></i>
               <i v-else class="fas fa-search"></i>
-              {{ loading ? 'Processando...' : 'Pesquisar' }}
+              {{ loading ? 'Carregando...' : 'Pesquisar' }}
             </button>
           </div>
+
+          <button v-if="!($auth && $auth.hasPermission('infra'))" @click="syncData" :disabled="syncing || loading" class="btn-sync-now glass-panel" :title="'Importar chamados do GLPI para o período selecionado'">
+            <i :class="syncing ? 'fas fa-spinner fa-spin' : 'fas fa-sync-alt'"></i>
+            {{ syncing ? 'Sincronizando...' : 'Sincronizar GLPI' }}
+          </button>
           
           <button @click="exportToExcel" class="btn-print glass-panel no-print">
             <i class="fas fa-file-excel"></i>
@@ -37,6 +42,14 @@
           </button>
         </div>
       </header>
+
+      <!-- Toast de notificação -->
+      <Transition name="toast">
+        <div v-if="toastMsg" :class="['toast-notif', toastType]">
+          <i :class="toastType === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
+          {{ toastMsg }}
+        </div>
+      </Transition>
 
       <!-- Skeleton Loading -->
       <div v-if="loading" class="skeleton-grid">
@@ -93,7 +106,7 @@
             </div>
           </div>
 
-          <div class="kpi-card glass-panel">
+          <div v-if="!($auth && $auth.hasPermission('infra'))" class="kpi-card glass-panel">
             <div class="kpi-icon gold"><i class="fas fa-clipboard-check"></i></div>
             <div class="kpi-info">
               <span class="label">Etapas Auditoria</span>
@@ -113,8 +126,8 @@
                 <p v-else>Atenção: O SLA de <strong>{{ stats.percent_sla }}%</strong> está abaixo da meta institucional de 90%.</p>
               </div>
             </div>
-            <div class="summary-divider"></div>
-            <div class="summary-section">
+            <div v-if="!($auth && $auth.hasPermission('infra'))" class="summary-divider"></div>
+            <div v-if="!($auth && $auth.hasPermission('infra'))" class="summary-section">
               <i class="fas fa-tasks"></i>
               <div class="summary-text">
                 <h4>Auditoria e Governança</h4>
@@ -149,7 +162,7 @@
             </div>
           </div>
 
-          <div class="breakdown-box glass-panel audit-results">
+          <div v-if="!($auth && $auth.hasPermission('infra'))" class="breakdown-box glass-panel audit-results">
             <h3>Tabela de Auditoria</h3>
             <div class="table-responsive">
               <table class="audit-table">
@@ -276,10 +289,12 @@ export default {
   name: 'SlaAudit',
   setup() {
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Padrão: início de 3 meses atrás (cobre histórico de INFRA desde maio/2026)
+    const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1);
     
     const todayStr = today.toISOString().slice(0, 10);
-    const startDate = ref(todayStr);
+    const threeMonthsAgoStr = threeMonthsAgo.toISOString().slice(0, 10);
+    const startDate = ref(threeMonthsAgoStr);
     const endDate = ref(todayStr);
     
     const loading = ref(false)
@@ -299,6 +314,8 @@ export default {
     const searchQuery = ref('')
     const showModal = ref(false)
     const selectedCategory = ref('')
+    const toastMsg = ref('')
+    const toastType = ref('success')
 
     const monthsList = computed(() => {
       const list = []
@@ -334,9 +351,42 @@ export default {
     }
 
     const handleSearch = async () => {
-      // Agora buscamos direto do banco de dados (que é alimentado pelo background job)
-      // Isso torna a pesquisa instantânea.
       await fetchData();
+    }
+
+    // Força sync do GLPI para o período selecionado
+    const syncData = async () => {
+      syncing.value = true
+      toastMsg.value = ''
+      try {
+        // Timeout de 5 minutos — GLPI pode demorar para responder em períodos longos
+        const res = await axios.post(`${API_CONFIG.BASE_URL}/sla/sync`, null, {
+          params: { start_date: startDate.value, end_date: endDate.value },
+          timeout: 300000  // 5 minutos
+        })
+        const r = res.data
+        const tiCount    = r.ti_count    ?? '?'
+        const infraCount = r.infra_count ?? '?'
+        const processed  = r.processed   ?? '?'
+        toastMsg.value = `✅ Sync concluído! TI: ${tiCount} | INFRA: ${infraCount} chamados importados`
+        toastType.value = 'success'
+        // Recarregar dados após sync
+        await fetchData()
+      } catch (e) {
+        console.error('Erro no sync:', e)
+        if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
+          toastMsg.value = '⏱ Sync ainda em andamento (timeout). Os dados serão atualizados pelo agendador em breve.'
+        } else if (e.response?.status === 500) {
+          toastMsg.value = `❌ Erro no backend: ${e.response.data?.detail ?? 'Falha na conexão com GLPI'}` 
+        } else {
+          toastMsg.value = '❌ Erro ao sincronizar. Verifique se o backend está rodando.'
+        }
+        toastType.value = 'error'
+      } finally {
+        syncing.value = false
+        // Esconde o toast após 8 segundos (maior para erros com mais texto)
+        setTimeout(() => { toastMsg.value = '' }, 8000)
+      }
     }
 
     const filteredTickets = computed(() => {
@@ -374,6 +424,14 @@ export default {
     }
 
     const formatMinutes = (min) => {
+      if (!min || min <= 0) return '0m'
+      // >= 1440 min (24h): exibe em dias — usado para INFRA (VAZAMENTO 2d, PINTURA 7d, etc.)
+      if (min >= 1440) {
+        const d = Math.floor(min / 1440)
+        const h = Math.floor((min % 1440) / 60)
+        return h > 0 ? `${d}d ${h}h` : `${d}d`
+      }
+      // < 24h: exibe em horas e minutos — TI (8h, 4h, etc.)
       if (min < 60) return `${min}m`
       const h = Math.floor(min / 60)
       const m = min % 60
@@ -381,7 +439,8 @@ export default {
     }
 
     onMounted(() => {
-      // Removido o fetchData automático para aguardar ação do usuário
+      // Carregar dados automaticamente ao abrir o componente
+      fetchData();
     });
 
     onUnmounted(() => {
@@ -391,11 +450,12 @@ export default {
     });
 
     return {
-      startDate, endDate, loading, stats, 
-      handleSearch, getSlaColor, 
+      startDate, endDate, loading, syncing, stats, 
+      handleSearch, syncData, getSlaColor, 
       searchQuery, formatMinutes, filteredTickets, tickets,
       showModal, selectedCategory, ticketsByCategory,
       openCategoryModal, closeModal,
+      toastMsg, toastType,
       exportToExcel: () => {
         if (!tickets.value || tickets.value.length === 0) {
           alert("Não há dados para exportar.");
@@ -564,6 +624,64 @@ export default {
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+.btn-sync-now {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  color: #10b981;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-sync-now:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.6);
+  transform: translateY(-1px);
+}
+
+.btn-sync-now:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Toast de notificação */
+.toast-notif {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.toast-notif.success {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.toast-notif.error {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.toast-enter-active, .toast-leave-active { transition: all 0.4s ease; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(1rem); }
 
 .btn-sync-new {
   background: rgba(255, 255, 255, 0.05);
