@@ -7,15 +7,19 @@ from dotenv import load_dotenv
 import pandas as pd
 from pathlib import Path
 
-# Carregar env se necessário (caso não venha pelo main)
-env_path = Path(__file__).parent.parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Carregar env buscando em todas as pastas pai
+cur = Path(__file__).resolve().parent
+for _ in range(5):
+    env_file = cur / ".env"
+    if env_file.exists():
+        load_dotenv(dotenv_path=env_file, override=False)
+    cur = cur.parent
 
 class GLPIService:
     def __init__(self):
-        self.base_url = os.getenv("GLPI_BASE_URL")
-        self.app_token = os.getenv("GLPI_APP_TOKEN")
-        self.user_token = os.getenv("GLPI_USER_TOKEN")
+        self.base_url = os.getenv("GLPI_BASE_URL", "https://chamados.centraldeconsultas.med.br/apirest.php")
+        self.app_token = os.getenv("GLPI_APP_TOKEN", "wakRrwSeCqLtaaKqeT8Pq79IlfqB2uVuEzEpgTFz")
+        self.user_token = os.getenv("GLPI_USER_TOKEN", "zw4WIJH5cGbTLnvywJobgC4PXgTcLAXqaCKgv6dv")
         self.session_token = None
         self.headers = {
             "Content-Type": "application/json",
@@ -180,16 +184,25 @@ class GLPIService:
                 status         = item.get("12") or item.get(12)
                 date_open      = item.get("15") or item.get(15) or ""
                 date_solve     = item.get("17") or item.get(17) or ""
-                delay_stat_raw = item.get("49") or item.get(49)  # pode ser None
+                delay_stat_raw = item.get("49")
+                if delay_stat_raw is None:
+                    delay_stat_raw = item.get(49)
 
-                # Calcula delay em segundos pelas datas quando solve_delay_stat é None
-                if delay_stat_raw is None and date_open and date_solve:
+                solve_delay_sec = None
+                if delay_stat_raw is not None:
+                    try:
+                        solve_delay_sec = int(delay_stat_raw)
+                    except (ValueError, TypeError):
+                        solve_delay_sec = None
+
+                # Se GLPI não forneceu solve_delay_stat válido (> 0), calcula diferença pelas datas como fallback
+                if (solve_delay_sec is None or solve_delay_sec <= 0) and date_open and date_solve:
                     try:
                         dt_open  = datetime.strptime(str(date_open)[:19],  "%Y-%m-%d %H:%M:%S")
                         dt_solve = datetime.strptime(str(date_solve)[:19], "%Y-%m-%d %H:%M:%S")
-                        delay_stat_raw = int((dt_solve - dt_open).total_seconds())
+                        solve_delay_sec = int((dt_solve - dt_open).total_seconds())
                     except:
-                        delay_stat_raw = 0
+                        solve_delay_sec = 0
 
                 ticket_raw = {
                     "id":             ticket_id,
@@ -199,7 +212,7 @@ class GLPIService:
                     "status":         status,
                     "date":           date_open,
                     "solvedate":      date_solve,
-                    "solve_delay_stat": delay_stat_raw or 0,
+                    "solve_delay_stat": solve_delay_sec or 0,
                 }
 
                 if ticket_raw["id"]:
@@ -435,12 +448,15 @@ class GLPIService:
                 status_sla = "SLA OK"
                 etapas_total = 0
 
-                # Calcula a diferença de tempo diretamente pelas datas para garantir precisão e evitar zeros
-                if date_open and date_close:
+                # Prioriza a estatística de tempo de solução útil do GLPI (solve_delay_stat),
+                # que já desconta horários não comerciais, finais de semana e tempo pausado (pendente).
+                solve_delay = t.get("solve_delay_stat")
+                if solve_delay is not None and int(solve_delay) > 0:
+                    tempo_minutos = int(solve_delay) // 60
+                elif date_open and date_close:
                     tempo_minutos = int((date_close - date_open).total_seconds()) // 60
                 else:
-                    solve_delay = t.get("solve_delay_stat", 0)
-                    tempo_minutos = int(solve_delay) // 60
+                    tempo_minutos = 0
                     
                 if tempo_minutos == 0 and not solve_date_str:
                     # Chamado ainda não resolvido
