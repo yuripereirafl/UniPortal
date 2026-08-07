@@ -126,7 +126,8 @@ class GLPIService:
             "forcedisplay[3]": "12",  # status
             "forcedisplay[4]": "15",  # date (abertura)
             "forcedisplay[5]": "17",  # solvedate
-            "forcedisplay[6]": "49",  # solve_delay_stat
+            "forcedisplay[6]": "154", # solve_delay_stat (field 154 do GLPI em segundos)
+            "forcedisplay[7]": "49",  # solve_delay_stat (backup)
         }
 
         use_search_api = True
@@ -173,7 +174,7 @@ class GLPIService:
             # field "1" = name (título),  field "2" = id do ticket
             # field "7" = nome da categoria JÁ RESOLVIDO (ex: 'T.I', 'CHAMADOS INFRAESTRUTURA > VAZAMENTO')
             # field "12" = status,  field "15" = data abertura,  field "17" = solvedate
-            # field "49" = solve_delay_stat (pode ser None — calculamos pelas datas)
+            # field "154" / "49" = solve_delay_stat em segundos
             if page_num == 1 and data:
                 print(f"   [DEBUG] Mapeamento Search API: {dict(list(data[0].items())[:10])}")
 
@@ -184,9 +185,7 @@ class GLPIService:
                 status         = item.get("12") or item.get(12)
                 date_open      = item.get("15") or item.get(15) or ""
                 date_solve     = item.get("17") or item.get(17) or ""
-                delay_stat_raw = item.get("49")
-                if delay_stat_raw is None:
-                    delay_stat_raw = item.get(49)
+                delay_stat_raw = item.get("154") or item.get("49") or item.get(154) or item.get(49)
 
                 solve_delay_sec = None
                 if delay_stat_raw is not None:
@@ -383,43 +382,34 @@ class GLPIService:
             else:
                 cat_name = cat_full_name.strip()
 
-            # Encontrar regra (Melhorado para bater com planilha)
+            # Encontrar regra (Melhorado para bater com planilha e DB)
             rule = None
+            ticket_title = t.get("name", "").upper()
             
-            # Tenta match por nome da categoria no ticket vs TIPO na regra
+            def norm(s):
+                import unicodedata
+                return unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('ASCII').upper()
+
+            norm_title = norm(ticket_title)
+            norm_cat = norm(cat_name)
+
+            # 1. Tenta match direto por categoria ou por título do chamado vs TIPO da regra
             for r_tipo, r_obj in rules.items():
-                # Exemplos na planilha: "CHAMADOS TI - ACESSOS", "CHAMADOS INFRAESTRUTURA - VAZAMENTO"
-                # Exemplos no GLPI: "ACESSOS", "VAZAMENTO"
                 clean_r_tipo = r_tipo.replace("CHAMADOS TI - ", "").replace("CHAMADOS INFRAESTRUTURA - ", "").strip()
+                norm_rule = norm(clean_r_tipo)
                 
-                is_rule_ti = "CHAMADOS TI -" in r_tipo
                 is_rule_infra = "CHAMADOS INFRAESTRUTURA -" in r_tipo
+                is_rule_ti = not is_rule_infra
                 
                 if is_ti and is_rule_ti:
-                    if cat_name == clean_r_tipo or cat_name in clean_r_tipo or clean_r_tipo in cat_name:
+                    if norm_cat == norm_rule or norm_rule in norm_cat or norm_cat in norm_rule or norm_rule in norm_title:
                         rule = r_obj
                         break
                 elif is_infra and is_rule_infra:
-                    if cat_name == clean_r_tipo or cat_name in clean_r_tipo or clean_r_tipo in cat_name:
+                    if norm_cat == norm_rule or norm_rule in norm_cat or norm_cat in norm_rule or norm_rule in norm_title:
                         rule = r_obj
                         break
-            
-            if not rule:
-                # Tenta match pelo título do chamado (backup)
-                ticket_title = t.get("name", "").upper()
-                for r_tipo, r_obj in rules.items():
-                    clean_r_tipo = r_tipo.replace("CHAMADOS TI - ", "").replace("CHAMADOS INFRAESTRUTURA - ", "").strip()
-                    is_rule_ti = "CHAMADOS TI -" in r_tipo
-                    is_rule_infra = "CHAMADOS INFRAESTRUTURA -" in r_tipo
-                    
-                    if is_ti and is_rule_ti:
-                        if clean_r_tipo in ticket_title and len(clean_r_tipo) > 3:
-                            rule = r_obj
-                            break
-                    elif is_infra and is_rule_infra:
-                        if clean_r_tipo in ticket_title and len(clean_r_tipo) > 3:
-                            rule = r_obj
-                            break
+
             
             # Se ainda não achou regra específica mas sabemos a área, usa a regra OUTROS correspondente
             if not rule:
